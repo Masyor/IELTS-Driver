@@ -1,0 +1,6 @@
+{
+  "name": "IELTS Career Driver",
+  "description": "A high-octane top-down cyber-neon driving game for learning IELTS academic vocabulary. Complete words by driving through letters, avoid obstacles, earn cash, and purchase high-performance cars.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

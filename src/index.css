@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+@utility font-cyber {
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  letter-spacing: 0.05em;
+}

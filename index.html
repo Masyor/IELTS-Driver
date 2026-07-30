@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IELTS Career Driver - Top-Down Word Racer</title>
+    <!-- Phaser 3 CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js" crossorigin="anonymous"></script>
+    <script>
+      // Global error monitoring to translate CDN/Phaser issues into readable logs
+      window.addEventListener('error', function(e) {
+        if (!e || e.message === "Script error." || !e.filename || e.filename.indexOf('phaser') === -1 && e.filename.indexOf('src') === -1) {
+          // Ignore harmless cross-origin, extension, or non-app related script errors
+          return;
+        }
+        console.error("Intercepted unhandled script error:", e.message, "at", e.filename, ":", e.lineno);
+        window.dispatchEvent(new CustomEvent('global-script-error', {
+          detail: {
+            message: e.message || "Script Error (CORS or Phaser internal)",
+            filename: e.filename || "unknown",
+            lineno: e.lineno || 0,
+            colno: e.colno || 0,
+            error: e.error ? e.error.stack : null
+          }
+        }));
+      });
+    </script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Plus+Jakarta+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  </head>
+  <body class="bg-[#0b0f19] text-slate-100 antialiased overflow-hidden">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
