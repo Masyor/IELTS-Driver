@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { 
   Car, 
   BookOpen, 
@@ -11,7 +11,12 @@ import {
   VolumeX,
   RefreshCw,
   HelpCircle,
-  Play
+  Play,
+  Gamepad2,
+  LifeBuoy,
+  Keyboard,
+  X,
+  Navigation
 } from "lucide-react";
 import { IELTS_WORDS, IELTSWord } from "./data/words";
 import { CAR_MODELS, CarModel } from "./data/cars";
@@ -211,6 +216,178 @@ export const CarPreviewSvg = ({ carId, color, className = "w-24 h-40" }: { carId
   return null;
 };
 
+// Responsive Virtual Joystick Component for Touch/Mobile play
+const TouchJoystickControls = ({ onHonk }: { onHonk: () => void }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [stickPos, setStickPos] = useState({ x: 0, y: 0 });
+  const [active, setActive] = useState(false);
+  const [gasPressed, setGasPressed] = useState(false);
+  const [brakePressed, setBrakePressed] = useState(false);
+
+  const updateTouchControls = (steer: number, throttle: number) => {
+    (window as any).__touchControls = {
+      up: throttle > 0.2,
+      down: throttle < -0.2,
+      left: steer < -0.2,
+      right: steer > 0.2,
+      steer,
+      throttle
+    };
+  };
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    e.preventDefault();
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    setActive(true);
+    updateStick(e.clientX, e.clientY);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!active) return;
+    updateStick(e.clientX, e.clientY);
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    setActive(false);
+    setStickPos({ x: 0, y: 0 });
+    updateTouchControls(0, gasPressed ? 1 : brakePressed ? -1 : 0);
+  };
+
+  const updateStick = (clientX: number, clientY: number) => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const maxR = rect.width / 2 - 12;
+
+    let dx = clientX - centerX;
+    let dy = clientY - centerY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist > maxR) {
+      dx = (dx / dist) * maxR;
+      dy = (dy / dist) * maxR;
+    }
+
+    setStickPos({ x: dx, y: dy });
+
+    const steer = dx / maxR;
+    let throttle = -dy / maxR;
+    if (gasPressed) throttle = 1;
+    if (brakePressed) throttle = -1;
+
+    updateTouchControls(steer, throttle);
+  };
+
+  const handleGasDown = (e: React.SyntheticEvent) => {
+    e.preventDefault();
+    setGasPressed(true);
+    const currSteer = (window as any).__touchControls?.steer || 0;
+    updateTouchControls(currSteer, 1);
+  };
+
+  const handleGasUp = (e: React.SyntheticEvent) => {
+    e.preventDefault();
+    setGasPressed(false);
+    const currSteer = (window as any).__touchControls?.steer || 0;
+    const currStickThrottle = stickPos.y !== 0 ? -stickPos.y / 40 : 0;
+    updateTouchControls(currSteer, brakePressed ? -1 : currStickThrottle);
+  };
+
+  const handleBrakeDown = (e: React.SyntheticEvent) => {
+    e.preventDefault();
+    setBrakePressed(true);
+    const currSteer = (window as any).__touchControls?.steer || 0;
+    updateTouchControls(currSteer, -1);
+  };
+
+  const handleBrakeUp = (e: React.SyntheticEvent) => {
+    e.preventDefault();
+    setBrakePressed(false);
+    const currSteer = (window as any).__touchControls?.steer || 0;
+    const currStickThrottle = stickPos.y !== 0 ? -stickPos.y / 40 : 0;
+    updateTouchControls(currSteer, gasPressed ? 1 : currStickThrottle);
+  };
+
+  return (
+    <div className="absolute inset-x-0 bottom-4 z-30 pointer-events-none px-4 flex justify-between items-end touch-none select-none">
+      
+      {/* JOYSTICK ON BOTTOM LEFT */}
+      <div className="pointer-events-auto flex flex-col items-center gap-1">
+        <span className="text-[9px] font-cyber font-bold text-amber-400 uppercase tracking-widest bg-slate-950/80 px-2 py-0.5 rounded border border-amber-500/30">
+          ANALOG JOYSTICK
+        </span>
+        <div
+          ref={containerRef}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          className="w-32 h-32 sm:w-36 sm:h-36 rounded-full bg-slate-950/85 border-2 border-amber-500/60 backdrop-blur-md flex items-center justify-center relative shadow-[0_0_25px_rgba(245,158,11,0.25)]"
+        >
+          <div className="absolute inset-2 rounded-full border border-dashed border-amber-500/30" />
+          <div className="absolute top-1.5 text-[10px] font-cyber text-amber-500/80 font-black">▲</div>
+          <div className="absolute bottom-1.5 text-[10px] font-cyber text-amber-500/80 font-black">▼</div>
+          <div className="absolute left-1.5 text-[10px] font-cyber text-amber-500/80 font-black">◄</div>
+          <div className="absolute right-1.5 text-[10px] font-cyber text-amber-500/80 font-black">►</div>
+
+          <div
+            className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-yellow-400 via-amber-500 to-amber-600 border-2 border-white shadow-[0_0_15px_rgba(251,191,36,0.6)] flex items-center justify-center transition-transform duration-75 ${
+              active ? "scale-105" : ""
+            }`}
+            style={{
+              transform: `translate(${stickPos.x}px, ${stickPos.y}px)`,
+            }}
+          >
+            <div className="w-5 h-5 rounded-full bg-slate-950/50 border border-amber-200" />
+          </div>
+        </div>
+      </div>
+
+      {/* ACTION BUTTONS ON BOTTOM RIGHT */}
+      <div className="pointer-events-auto flex items-end gap-2.5">
+        
+        <button
+          onClick={onHonk}
+          className="w-12 h-12 rounded-full bg-amber-950/80 border-2 border-amber-400 text-amber-300 font-cyber font-black text-[10px] uppercase shadow-lg flex items-center justify-center active:scale-90 transition-transform cursor-pointer"
+        >
+          HONK
+        </button>
+
+        <button
+          onPointerDown={handleBrakeDown}
+          onPointerUp={handleBrakeUp}
+          onPointerCancel={handleBrakeUp}
+          className={`w-16 h-16 sm:w-18 sm:h-18 rounded-2xl border-2 font-cyber font-black text-xs uppercase flex flex-col items-center justify-center shadow-xl transition-all active:scale-95 ${
+            brakePressed 
+              ? "bg-rose-600 border-white text-white shadow-rose-500/50 scale-95" 
+              : "bg-rose-950/80 border-rose-500 text-rose-300"
+          }`}
+        >
+          <span>BRAKE</span>
+          <span className="text-[8px] opacity-75">REV</span>
+        </button>
+
+        <button
+          onPointerDown={handleGasDown}
+          onPointerUp={handleGasUp}
+          onPointerCancel={handleGasUp}
+          className={`w-20 h-20 sm:w-22 sm:h-22 rounded-2xl border-2 font-cyber font-black text-sm uppercase flex flex-col items-center justify-center shadow-2xl transition-all active:scale-95 ${
+            gasPressed 
+              ? "bg-emerald-500 border-white text-slate-950 shadow-emerald-400/50 scale-95" 
+              : "bg-emerald-950/80 border-emerald-400 text-emerald-300"
+          }`}
+        >
+          <Zap className="w-5 h-5 mb-0.5" />
+          <span>GAS</span>
+        </button>
+
+      </div>
+
+    </div>
+  );
+};
+
 export default function App() {
   // Navigation tabs: 'streets' | 'garage' | 'dictionary'
   const [activeTab, setActiveTab] = useState<"streets" | "garage" | "dictionary">("streets");
@@ -250,6 +427,12 @@ export default function App() {
   const [carSpeed, setCarSpeed] = useState<number>(0);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [toast, setToast] = useState<{ text: string; type: "success" | "info" | "error" | "bonus" } | null>(null);
+  
+  // Mobile touch joystick controls state (ON by default)
+  const [showTouchControls, setShowTouchControls] = useState<boolean>(true);
+  
+  // Welcome pop-up modal state (ON by default on game launch)
+  const [showWelcomeModal, setShowWelcomeModal] = useState<boolean>(true);
   
   // Refs
   const phaserContainerRef = useRef<HTMLDivElement>(null);
@@ -720,9 +903,11 @@ export default function App() {
         this.gpsPointer.setScrollFactor(0); // Anchored to camera view
 
         // Spawn Player Car (Starts on safe road intersection)
-        this.player = this.physics.add.sprite(400, 400, "car_chassis");
+        const initialCarKey = this.textures.exists("car_" + activeCarId) ? ("car_" + activeCarId) : "car_rusty_banger";
+        this.player = this.physics.add.sprite(400, 400, this.textures.exists(initialCarKey) ? initialCarKey : "car_chassis");
         this.player.setCollideWorldBounds(true);
         this.player.setOrigin(0.5, 0.5);
+        this.player.setDepth(20);
         this.player.setCircle(18, 2, 22);
 
         // Sync initial car configuration stats from React state
@@ -751,26 +936,32 @@ export default function App() {
         this.physics.add.collider(this.player, this.npcGroup, this.onNPCHit, undefined, this);
 
         // Attach listeners for incoming changes from React
-        window.addEventListener("react-vehicle-changed", this.onReactCarChange as any);
-        window.addEventListener("react-car-color-changed", this.onReactColorChange as any);
-        window.addEventListener("react-word-changed", this.onReactWordChange as any);
-        window.addEventListener("react-cash-changed", this.onReactCashChange as any);
-        window.addEventListener("react-unscramble-changed", this.onReactUnscrambleChange as any);
-
-        // Cleanup listeners on scene shutdown
-        this.events.once("shutdown", () => {
+        const cleanUpEventListeners = () => {
           window.removeEventListener("react-vehicle-changed", this.onReactCarChange as any);
           window.removeEventListener("react-car-color-changed", this.onReactColorChange as any);
           window.removeEventListener("react-word-changed", this.onReactWordChange as any);
           window.removeEventListener("react-cash-changed", this.onReactCashChange as any);
           window.removeEventListener("react-unscramble-changed", this.onReactUnscrambleChange as any);
-        });
+          window.removeEventListener("react-teleport-start", this.onReactTeleportStart as any);
+        };
+
+        window.addEventListener("react-vehicle-changed", this.onReactCarChange as any);
+        window.addEventListener("react-car-color-changed", this.onReactColorChange as any);
+        window.addEventListener("react-word-changed", this.onReactWordChange as any);
+        window.addEventListener("react-cash-changed", this.onReactCashChange as any);
+        window.addEventListener("react-unscramble-changed", this.onReactUnscrambleChange as any);
+        window.addEventListener("react-teleport-start", this.onReactTeleportStart as any);
+
+        // Cleanup listeners on scene shutdown or destroy
+        this.events.once("shutdown", cleanUpEventListeners);
+        this.events.once("destroy", cleanUpEventListeners);
       }
 
       onReactUnscrambleChange = (e: CustomEvent<boolean>) => {
+        if (!this.sys || !this.sys.isActive() || !this.physics) return;
         if (e && typeof e.detail === "boolean") {
           this.currentIsUnscrambling = e.detail;
-          if (!this || !this.physics || !this.physics.world) return;
+          if (!this.physics.world) return;
           if (e.detail) {
             this.physics.world.pause();
             this.velocity = 0;
@@ -794,18 +985,21 @@ export default function App() {
       };
 
       onReactCarChange = (e: CustomEvent<string>) => {
+        if (!this.sys || !this.sys.isActive()) return;
         if (e && e.detail) {
           this.syncCarStats(e.detail);
         }
       };
 
       onReactColorChange = (e: CustomEvent<{ carId: string; color: string }>) => {
+        if (!this.sys || !this.sys.isActive()) return;
         if (e && e.detail && e.detail.carId === this.currentCarId) {
           this.syncCarStats(this.currentCarId, e.detail.color);
         }
       };
 
       onReactWordChange = (e: CustomEvent<number>) => {
+        if (!this.sys || !this.sys.isActive()) return;
         if (e && typeof e.detail === "number") {
           this.currentWordIndex = e.detail;
         }
@@ -813,12 +1007,24 @@ export default function App() {
       };
 
       onReactCashChange = (e: CustomEvent<number>) => {
+        if (!this.sys || !this.sys.isActive()) return;
         if (e && typeof e.detail === "number") {
           this.currentCash = e.detail;
         }
       };
 
+      onReactTeleportStart = () => {
+        if (!this.sys || !this.sys.isActive() || !this.player) return;
+        this.player.setPosition(400, 400);
+        this.player.setRotation(0);
+        this.velocity = 0;
+        if (this.player.body && 'setVelocity' in this.player.body) {
+          (this.player.body as any).setVelocity(0, 0);
+        }
+      };
+
       syncCarStats(carId: string, customColorHex?: string) {
+        if (!this.sys || !this.sys.isActive() || !this.textures) return;
         const spec = CAR_MODELS.find(c => c.id === carId) || CAR_MODELS[0];
         this.currentCarId = spec.id;
         this.maxSpeed = spec.maxSpeed;
@@ -843,11 +1049,16 @@ export default function App() {
           const texName = "car_" + spec.id;
           if (this.textures.exists(texName)) {
             this.player.setTexture(texName);
+          } else if (this.textures.exists("car_rusty_banger")) {
+            this.player.setTexture("car_rusty_banger");
           } else {
             this.player.setTexture("car_chassis");
           }
 
           this.player.setTint(this.carColor);
+          this.player.setAlpha(1.0);
+          this.player.setVisible(true);
+          this.player.setDepth(20);
 
           // Precision top-down circular collision body setup matching texture dimensions
           if (spec.id === "rusty_banger") {
@@ -876,6 +1087,35 @@ export default function App() {
       }
 
       generateVectorTextures() {
+        if (!this.textures) return;
+        if (
+          this.textures.exists("car_rusty_banger") &&
+          this.textures.exists("car_chassis") &&
+          this.textures.exists("npc_chassis") &&
+          this.textures.exists("smoke_puff")
+        ) {
+          return;
+        }
+
+        // Safe helper for Canvas roundRect fallback across all browsers
+        const drawRoundRect = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) => {
+          if (typeof ctx.roundRect === "function") {
+            ctx.roundRect(x, y, w, h, r);
+          } else {
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+            ctx.lineTo(x + w, y + h - r);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+            ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+          }
+        };
+
         // Exhaust particle drawing
         const smoke = this.textures.createCanvas("smoke_puff", 8, 8);
         const smokeCtx = smoke.context;
@@ -908,7 +1148,7 @@ export default function App() {
         bCtx.strokeStyle = "#475569";
         bCtx.fillStyle = "#ffffff";
         bCtx.beginPath();
-        bCtx.roundRect(5, 6, 26, 58, 6);
+        drawRoundRect(bCtx, 5, 6, 26, 58, 6);
         bCtx.fill();
         bCtx.stroke();
         bCtx.fillStyle = "#92400e";
@@ -938,7 +1178,7 @@ export default function App() {
         sCtx.strokeStyle = "#ffffff";
         sCtx.fillStyle = "#ffffff";
         sCtx.beginPath();
-        sCtx.roundRect(6, 6, 28, 66, 7);
+        drawRoundRect(sCtx, 6, 6, 28, 66, 7);
         sCtx.fill();
         sCtx.stroke();
         sCtx.strokeStyle = "#cbd5e1";
@@ -949,7 +1189,7 @@ export default function App() {
         sCtx.stroke();
         sCtx.fillStyle = "#1e293b";
         sCtx.beginPath();
-        sCtx.roundRect(9, 22, 22, 28, 4);
+        drawRoundRect(sCtx, 9, 22, 22, 28, 4);
         sCtx.fill();
         sCtx.fillStyle = "#f59e0b";
         sCtx.fillRect(13, 34, 14, 4);
@@ -975,7 +1215,7 @@ export default function App() {
         iCtx.strokeStyle = "#ffffff";
         iCtx.fillStyle = "#ffffff";
         iCtx.beginPath();
-        iCtx.roundRect(6, 6, 30, 70, 10);
+        drawRoundRect(iCtx, 6, 6, 30, 70, 10);
         iCtx.fill();
         iCtx.stroke();
         iCtx.fillStyle = "#0f172a";
@@ -985,7 +1225,7 @@ export default function App() {
         iCtx.fillRect(26, 16, 4, 8);
         iCtx.fillStyle = "#020617";
         iCtx.beginPath();
-        iCtx.roundRect(10, 28, 22, 22, 5);
+        drawRoundRect(iCtx, 10, 28, 22, 22, 5);
         iCtx.fill();
         iCtx.fillStyle = "#020617";
         iCtx.strokeStyle = "#ffffff";
@@ -1057,7 +1297,7 @@ export default function App() {
         lCtx.strokeStyle = "#fef08a";
         lCtx.fillStyle = "#ffffff";
         lCtx.beginPath();
-        lCtx.roundRect(6, 6, 30, 118, 8);
+        drawRoundRect(lCtx, 6, 6, 30, 118, 8);
         lCtx.fill();
         lCtx.stroke();
         lCtx.strokeStyle = "#cbd5e1";
@@ -1085,8 +1325,27 @@ export default function App() {
         lCtx.fillRect(29, 9, 4, 3);
         limo.refresh();
 
-        // Legacy Alias
-        this.textures.createCanvas("car_chassis", 40, 80);
+        // Default / Fallback Chassis Texture (Fully drawn white body, 40x80)
+        const chassis = this.textures.createCanvas("car_chassis", 40, 80);
+        const cCtx = chassis.context;
+        cCtx.fillStyle = "#1e293b";
+        cCtx.fillRect(2, 10, 5, 14);
+        cCtx.fillRect(33, 10, 5, 14);
+        cCtx.fillRect(2, 54, 5, 14);
+        cCtx.fillRect(33, 54, 5, 14);
+        cCtx.lineWidth = 2;
+        cCtx.strokeStyle = "#ffffff";
+        cCtx.fillStyle = "#ffffff";
+        cCtx.beginPath();
+        drawRoundRect(cCtx, 6, 6, 28, 68, 6);
+        cCtx.fill();
+        cCtx.stroke();
+        cCtx.fillStyle = "#0f172a";
+        cCtx.fillRect(9, 22, 22, 22);
+        cCtx.fillStyle = "#fef08a";
+        cCtx.fillRect(9, 7, 4, 3);
+        cCtx.fillRect(27, 7, 4, 3);
+        chassis.refresh();
 
         // NPC Commuter Sedan
         const npc = this.textures.createCanvas("npc_chassis", 40, 75);
@@ -1100,12 +1359,12 @@ export default function App() {
         npcCtx.strokeStyle = "#ffffff";
         npcCtx.fillStyle = "#ffffff"; // White canvas body so tinting applies clean colors!
         npcCtx.beginPath();
-        npcCtx.roundRect(5, 5, 30, 65, 5);
+        drawRoundRect(npcCtx, 5, 5, 30, 65, 5);
         npcCtx.fill();
         npcCtx.stroke();
         npcCtx.fillStyle = "#0f172a";
         npcCtx.beginPath();
-        npcCtx.roundRect(9, 20, 22, 24, 3);
+        drawRoundRect(npcCtx, 9, 20, 22, 24, 3);
         npcCtx.fill();
         npcCtx.fillStyle = "#cbd5e1";
         npcCtx.fillRect(8, 3, 24, 3);
@@ -1525,11 +1784,14 @@ export default function App() {
       }
 
       driveSteerControls(time: number, delta: number) {
+        // Read touch/joystick input
+        const touchInput = (window as any).__touchControls || { up: false, down: false, left: false, right: false, steer: 0, throttle: 0 };
+
         // Read key binds
-        const up = this.cursors.up.isDown || this.wasd.up.isDown;
-        const down = this.cursors.down.isDown || this.wasd.down.isDown;
-        const left = this.cursors.left.isDown || this.wasd.left.isDown;
-        const right = this.cursors.right.isDown || this.wasd.right.isDown;
+        const up = this.cursors.up.isDown || this.wasd.up.isDown || touchInput.up;
+        const down = this.cursors.down.isDown || this.wasd.down.isDown || touchInput.down;
+        const left = this.cursors.left.isDown || this.wasd.left.isDown || touchInput.left;
+        const right = this.cursors.right.isDown || this.wasd.right.isDown || touchInput.right;
 
         // Freeze steering and acceleration when unscrambling
         if (this.currentIsUnscrambling) {
@@ -1540,17 +1802,28 @@ export default function App() {
         // Steering rotation (handling physics)
         if (Math.abs(this.velocity) > 10) {
           const steerRate = (this.handling * (delta / 1000)) * (this.velocity > 0 ? 1 : -0.65);
-          if (left) this.carAngle -= steerRate;
-          if (right) this.carAngle += steerRate;
+          if (Math.abs(touchInput.steer) > 0.05) {
+            this.carAngle += steerRate * touchInput.steer;
+          } else {
+            if (left) this.carAngle -= steerRate;
+            if (right) this.carAngle += steerRate;
+          }
         }
 
         // Forward/reverse throttle
         if (!this.isStunned) {
-          if (up) {
+          if (Math.abs(touchInput.throttle) > 0.05) {
+            if (touchInput.throttle > 0) {
+              this.velocity += this.acceleration * touchInput.throttle * (delta / 1000);
+              if (this.velocity > this.maxSpeed) this.velocity = this.maxSpeed;
+              this.sparkBoosterExhaust();
+            } else {
+              this.velocity += this.acceleration * 1.3 * touchInput.throttle * (delta / 1000); // throttle is negative
+              if (this.velocity < -this.maxSpeed * 0.45) this.velocity = -this.maxSpeed * 0.45;
+            }
+          } else if (up) {
             this.velocity += this.acceleration * (delta / 1000);
             if (this.velocity > this.maxSpeed) this.velocity = this.maxSpeed;
-
-            // Smoky exhaust puff
             this.sparkBoosterExhaust();
           } else if (down) {
             this.velocity -= this.acceleration * 1.3 * (delta / 1000);
@@ -1889,21 +2162,17 @@ export default function App() {
           }
         });
       }
-
-      destroy() {
-        window.removeEventListener("react-vehicle-changed", this.onReactCarChange as any);
-        window.removeEventListener("react-word-changed", this.onReactWordChange as any);
-        window.removeEventListener("react-cash-changed", this.onReactCashChange as any);
-        window.removeEventListener("react-unscramble-changed", this.onReactUnscrambleChange as any);
-      }
     }
 
     // Configure Phaser 3 parameters
+    const w = phaserContainerRef.current.clientWidth || 800;
+    const h = phaserContainerRef.current.clientHeight || 600;
+
     const gameConfig = {
       type: Phaser.AUTO,
       parent: phaserContainerRef.current,
-      width: phaserContainerRef.current.clientWidth,
-      height: phaserContainerRef.current.clientHeight,
+      width: w,
+      height: h,
       physics: {
         default: "arcade",
         arcade: {
@@ -1919,11 +2188,20 @@ export default function App() {
 
     // Handle resizing window to re-fit canvas dynamically
     const handleResize = () => {
-      if (phaserContainerRef.current && phaserGameRef.current) {
-        phaserGameRef.current.scale.resize(
-          phaserContainerRef.current.clientWidth,
-          phaserContainerRef.current.clientHeight
-        );
+      if (
+        phaserContainerRef.current &&
+        phaserGameRef.current &&
+        phaserGameRef.current.scale
+      ) {
+        const width = phaserContainerRef.current.clientWidth;
+        const height = phaserContainerRef.current.clientHeight;
+        if (width > 0 && height > 0) {
+          try {
+            phaserGameRef.current.scale.resize(width, height);
+          } catch (e) {
+            // Ignore resize errors during teardown
+          }
+        }
       }
     };
 
@@ -1933,7 +2211,11 @@ export default function App() {
     return () => {
       window.removeEventListener("resize", handleResize);
       if (phaserGameRef.current) {
-        phaserGameRef.current.destroy(true);
+        try {
+          phaserGameRef.current.destroy(true);
+        } catch (e) {
+          // Ignore destroy errors during unmount
+        }
         phaserGameRef.current = null;
       }
     };
@@ -2101,17 +2383,82 @@ export default function App() {
     }, 4500);
   };
 
+  // Trigger window resize when activeTab changes so Phaser recalculates canvas dimensions
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      window.dispatchEvent(new Event("resize"));
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [activeTab]);
+
+  const handleTeleportToStart = () => {
+    window.dispatchEvent(new Event("react-teleport-start"));
+    playAudioSynth("pickup");
+    triggerToast("⚡ Teleported car back to start location!", "info");
+  };
+
   const activeWordObj = IELTS_WORDS[activeWordIndex];
 
   return (
     <div className="w-screen h-screen flex flex-col md:flex-row bg-[#0c0d0f] font-sans overflow-hidden">
       
-      {/* LEFT SIDE NAVIGATION PANEL */}
-      <aside className="w-full md:w-80 shrink-0 bg-[#141619] border-b md:border-b-0 md:border-r border-slate-800 flex flex-col justify-between z-20 shadow-2xl">
+      {/* MOBILE COMPACT TOP HEADER (< md) */}
+      <header className="flex md:hidden items-center justify-between px-3 py-2 bg-[#111215] border-b border-slate-800 z-30 shrink-0 font-cyber">
+        <div className="flex items-center gap-2">
+          <h1 className="text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-500">
+            IELTS <span className="text-white">DRIVER</span>
+          </h1>
+          <span className="text-[10px] font-bold text-amber-400 bg-amber-950/50 border border-amber-500/30 px-1.5 py-0.5 rounded">
+            ${cash}
+          </span>
+        </div>
+
+        {/* Mobile Navigation Buttons */}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setActiveTab("streets")}
+            className={`px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
+              activeTab === "streets" 
+                ? "bg-amber-500 text-slate-950 shadow-[0_0_10px_rgba(245,158,11,0.3)]" 
+                : "bg-slate-900 text-slate-400 border border-slate-800"
+            }`}
+          >
+            <Compass className="w-3 h-3" />
+            <span>STREETS</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("garage")}
+            className={`px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
+              activeTab === "garage" 
+                ? "bg-amber-500 text-slate-950 shadow-[0_0_10px_rgba(245,158,11,0.3)]" 
+                : "bg-slate-900 text-slate-400 border border-slate-800"
+            }`}
+          >
+            <Car className="w-3 h-3" />
+            <span>GARAGE</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("dictionary")}
+            className={`px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
+              activeTab === "dictionary" 
+                ? "bg-amber-500 text-slate-950 shadow-[0_0_10px_rgba(245,158,11,0.3)]" 
+                : "bg-slate-900 text-slate-400 border border-slate-800"
+            }`}
+          >
+            <BookOpen className="w-3 h-3" />
+            <span>VOCAB</span>
+          </button>
+        </div>
+      </header>
+
+      {/* DESKTOP LEFT SIDEBAR (Hidden on mobile) */}
+      <aside className="hidden md:flex md:w-80 lg:w-96 shrink-0 bg-[#141619] border-r border-slate-800 flex-col justify-between z-20 shadow-2xl overflow-y-auto h-full">
         <div className="flex flex-col">
           
           {/* Brand Decal */}
-          <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-[#111215]">
+          <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-[#111215]">
             <div className="flex flex-col">
               <span className="text-[10px] tracking-widest text-amber-500 font-bold uppercase font-cyber">Career Vocational Driving</span>
               <h1 className="text-xl font-cyber font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-500 tracking-tight leading-none mt-0.5">
@@ -2124,69 +2471,169 @@ export default function App() {
           </div>
 
           {/* Nav Links */}
-          <nav className="p-4 flex flex-col gap-2">
+          <nav className="p-3 flex flex-col gap-2 border-b border-slate-800/80">
             
             <button
               onClick={() => setActiveTab("streets")}
-              className={`w-full p-3 rounded-xl flex items-center gap-3 font-cyber font-bold text-xs tracking-wider transition-all cursor-pointer ${
+              className={`w-full p-2.5 rounded-xl flex items-center justify-start gap-2.5 font-cyber font-bold text-xs tracking-wider transition-all cursor-pointer ${
                 activeTab === "streets" 
                   ? "bg-gradient-to-r from-amber-500/20 to-yellow-600/10 border border-amber-500 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.15)]" 
                   : "bg-slate-900/30 border border-transparent hover:border-slate-800 text-slate-400 hover:text-slate-200"
               }`}
             >
               <Compass className="w-4 h-4 shrink-0 text-amber-400" />
-              <span>STREETS RUN</span>
+              <span>STREETS</span>
             </button>
 
             <button
               onClick={() => setActiveTab("garage")}
-              className={`w-full p-3 rounded-xl flex items-center gap-3 font-cyber font-bold text-xs tracking-wider transition-all cursor-pointer ${
+              className={`w-full p-2.5 rounded-xl flex items-center justify-start gap-2.5 font-cyber font-bold text-xs tracking-wider transition-all cursor-pointer ${
                 activeTab === "garage" 
                   ? "bg-gradient-to-r from-amber-500/20 to-yellow-600/10 border border-amber-500 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.15)]" 
                   : "bg-slate-900/30 border border-transparent hover:border-slate-800 text-slate-400 hover:text-slate-200"
               }`}
             >
               <Car className="w-4 h-4 shrink-0 text-amber-400" />
-              <span>GARAGE BAY</span>
+              <span>GARAGE</span>
             </button>
 
             <button
               onClick={() => setActiveTab("dictionary")}
-              className={`w-full p-3 rounded-xl flex items-center gap-3 font-cyber font-bold text-xs tracking-wider transition-all cursor-pointer ${
+              className={`w-full p-2.5 rounded-xl flex items-center justify-start gap-2.5 font-cyber font-bold text-xs tracking-wider transition-all cursor-pointer ${
                 activeTab === "dictionary" 
                   ? "bg-gradient-to-r from-amber-500/20 to-yellow-600/10 border border-amber-500 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.15)]" 
                   : "bg-slate-900/30 border border-transparent hover:border-slate-800 text-slate-400 hover:text-slate-200"
               }`}
             >
               <BookOpen className="w-4 h-4 shrink-0 text-amber-400" />
-              <span>ACADEMIC TERM</span>
+              <span>VOCAB BANK</span>
             </button>
 
           </nav>
 
+          {/* ACTIVE VOCAB OBJECTIVE CARD */}
+          <div className="p-3.5 border-b border-slate-800/80 bg-[#0f1420] flex flex-col gap-2">
+            <div className="flex items-center gap-2 justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 font-cyber flex items-center gap-1">
+                <Trophy className="w-3.5 h-3.5 text-amber-400" /> ACTIVE OBJECTIVE
+              </span>
+              <span className={`text-[9px] px-2 py-0.5 rounded font-cyber font-bold uppercase border ${
+                activeWordObj?.difficulty === "Easy" ? "border-emerald-500/30 bg-emerald-950/20 text-emerald-400" :
+                activeWordObj?.difficulty === "Medium" ? "border-amber-500/30 bg-amber-950/20 text-amber-400" :
+                "border-rose-500/30 bg-rose-950/20 text-rose-400"
+              }`}>
+                {activeWordObj?.difficulty || "Medium"}
+              </span>
+            </div>
+
+            <p className="text-xs text-slate-200 leading-relaxed font-sans font-medium bg-slate-950/60 p-2.5 rounded-lg border border-slate-900">
+              {activeWordObj?.definition || "Select a word to practice"}
+            </p>
+
+            {/* Spell Tracker Letters */}
+            <div className="flex flex-col gap-1.5 mt-1">
+              <div className="flex justify-between items-center text-[10px] text-slate-400 font-cyber">
+                <span>LETTERS ({collectedLetters.length} / {activeWordObj?.word.length || 0})</span>
+                <span className="text-amber-400 font-bold">Collect on map!</span>
+              </div>
+              <div className="flex gap-1.5 font-cyber font-bold text-base flex-wrap">
+                {Array.from({ length: activeWordObj?.word.length || 0 }).map((_, idx) => {
+                  const hasLetter = idx < collectedLetters.length;
+                  const letterObj = collectedLetters[idx];
+
+                  return (
+                    <span 
+                      key={idx} 
+                      className={`w-7 h-7 rounded border flex items-center justify-center transition-all ${
+                        hasLetter 
+                          ? "border-emerald-500 bg-emerald-950/40 text-emerald-400 font-black shadow-[0_0_8px_rgba(16,185,129,0.2)]" 
+                          : "border-amber-500/60 bg-amber-500/10 text-amber-400 border animate-pulse"
+                      }`}
+                    >
+                      {hasLetter ? letterObj.char : "?"}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* TELEMETRY & CONTROLS INFO CARD */}
+          <div className="p-3.5 border-b border-slate-800/80 bg-[#0c0e12] flex flex-col gap-2.5 font-cyber">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Gauge className="w-3.5 h-3.5 text-cyan-400" />
+                <span className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">LIVE TELEMETRY</span>
+              </div>
+              <div className="flex items-baseline gap-1">
+                <span className="text-lg font-black text-white">{carSpeed}</span>
+                <span className="text-[9px] text-slate-400">MPH</span>
+              </div>
+            </div>
+
+            {/* Mobile Controls Toggle Button */}
+            <button
+              onClick={() => setShowTouchControls(!showTouchControls)}
+              className={`w-full py-2 px-3 rounded-lg border text-xs font-cyber font-bold flex items-center justify-between transition-all cursor-pointer ${
+                showTouchControls 
+                  ? "bg-amber-950/30 border-amber-500/60 text-amber-300" 
+                  : "bg-slate-900/50 border-slate-800 text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <Gamepad2 className="w-4 h-4 text-amber-400" />
+                <span>MOBILE JOYSTICK</span>
+              </span>
+              <span className={`text-[9px] px-1.5 py-0.5 rounded font-black ${showTouchControls ? "bg-amber-500 text-slate-950" : "bg-slate-800 text-slate-500"}`}>
+                {showTouchControls ? "ON" : "OFF"}
+              </span>
+            </button>
+
+            {/* Help & Guide Buttons */}
+            <div className="grid grid-cols-2 gap-2 mt-0.5">
+              <button
+                onClick={handleTeleportToStart}
+                className="py-1.5 px-2 rounded-lg bg-rose-950/20 hover:bg-rose-900/40 border border-amber-500/40 hover:border-rose-500/80 text-amber-300 hover:text-rose-300 text-[10px] font-cyber font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                title="Teleport car back to start location"
+              >
+                <LifeBuoy className="w-3.5 h-3.5 text-amber-400" />
+                <span>HELP STUCK</span>
+              </button>
+
+              <button
+                onClick={() => setShowWelcomeModal(true)}
+                className="py-1.5 px-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-amber-500/50 text-slate-300 hover:text-amber-300 text-[10px] font-cyber font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                title="View game loop and controls guide"
+              >
+                <HelpCircle className="w-3.5 h-3.5 text-amber-400" />
+                <span>GAME GUIDE</span>
+              </button>
+            </div>
+          </div>
+
         </div>
 
         {/* Career Stats Dashboard */}
-        <div className="p-5 border-t border-slate-800/80 bg-[#0e1013] flex flex-col gap-3 font-cyber">
+        <div className="p-4 border-t border-slate-800/80 bg-[#0e1013] flex flex-col gap-2.5 font-cyber">
           <span className="text-[9px] uppercase tracking-widest text-slate-500 font-bold block">Career Metrics</span>
           
           <div className="grid grid-cols-2 gap-2">
             
-            <div className="bg-slate-950/50 rounded-lg p-2.5 border border-slate-900">
+            <div className="bg-slate-950/50 rounded-lg p-2 border border-slate-900">
               <span className="text-[8px] text-slate-500 block">CASH</span>
               <span className="text-sm font-bold text-amber-400">${cash}</span>
             </div>
 
-            <div className="bg-slate-950/50 rounded-lg p-2.5 border border-slate-900">
+            <div className="bg-slate-950/50 rounded-lg p-2 border border-slate-900">
               <span className="text-[8px] text-slate-500 block">COMPLETED</span>
               <span className="text-sm font-bold text-amber-500">{wordsSolvedCount} words</span>
             </div>
 
           </div>
 
-          <div className="bg-slate-950/70 rounded-lg p-3 border border-slate-900 flex items-center gap-3 mt-1">
-            <div className="w-8 h-8 rounded bg-slate-900 flex items-center justify-center shrink-0 border border-slate-800">
-              <Car className="w-4 h-4" style={{ color: activeCarSpec.colorStr }} />
+          <div className="bg-slate-950/70 rounded-lg p-2.5 border border-slate-900 flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded bg-slate-900 flex items-center justify-center shrink-0 border border-slate-800">
+              <Car className="w-3.5 h-3.5" style={{ color: activeCarSpec.colorStr }} />
             </div>
             <div className="flex flex-col">
               <span className="text-[8px] text-slate-400 block">CURRENT VEHICLE</span>
@@ -2194,15 +2641,96 @@ export default function App() {
             </div>
           </div>
         </div>
-
       </aside>
 
       {/* RIGHT MAIN AREA CONTAINING PHASER VIEW & OVERLAYS */}
-      <div className="flex-grow h-full relative flex flex-col">
+      <div className="flex-1 h-full relative overflow-hidden flex flex-col">
+        
+        {/* MOBILE COMPACT FLOATING OBJECTIVE CARD ON MAP */}
+        {activeTab === "streets" && (
+          <div className="md:hidden absolute top-2 left-2 right-2 z-20 bg-[#0f172a]/95 border border-amber-500/40 rounded-xl p-2.5 backdrop-blur-md shadow-2xl flex flex-col gap-1.5 pointer-events-auto">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 font-cyber flex items-center gap-1">
+                <Trophy className="w-3 h-3 text-amber-400" /> ACTIVE OBJECTIVE
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={handleTeleportToStart}
+                  className="text-[9px] font-cyber font-bold px-2 py-0.5 rounded bg-rose-950/40 border border-amber-500/50 text-amber-300 flex items-center gap-1 cursor-pointer"
+                  title="Teleport car back to start intersection"
+                >
+                  <LifeBuoy className="w-3 h-3 text-amber-400" />
+                  <span>STUCK?</span>
+                </button>
+                <button
+                  onClick={() => setShowTouchControls(!showTouchControls)}
+                  className="text-[9px] font-cyber font-bold px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-amber-400 flex items-center gap-1 cursor-pointer"
+                >
+                  <Gamepad2 className="w-3 h-3" />
+                  <span>{showTouchControls ? "JOYSTICK ON" : "JOYSTICK OFF"}</span>
+                </button>
+                <span className="text-[9px] font-cyber font-bold text-cyan-400 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800">{carSpeed} MPH</span>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-slate-200 line-clamp-2 leading-tight font-sans">
+              {activeWordObj?.definition || "Select a word to practice"}
+            </p>
+
+            {/* Spell Tracker Letters */}
+            <div className="flex items-center justify-between pt-1 border-t border-slate-800/80">
+              <span className="text-[9px] text-slate-400 font-cyber">
+                LETTERS ({collectedLetters.length}/{activeWordObj?.word.length || 0})
+              </span>
+              <div className="flex gap-1 font-cyber font-bold text-xs">
+                {Array.from({ length: activeWordObj?.word.length || 0 }).map((_, idx) => {
+                  const hasLetter = idx < collectedLetters.length;
+                  const letterObj = collectedLetters[idx];
+
+                  return (
+                    <span 
+                      key={idx} 
+                      className={`w-5 h-5 rounded border flex items-center justify-center ${
+                        hasLetter 
+                          ? "border-emerald-500 bg-emerald-950/50 text-emerald-400 font-black" 
+                          : "border-amber-500/60 bg-amber-500/10 text-amber-400 border animate-pulse"
+                      }`}
+                    >
+                      {hasLetter ? letterObj.char : "?"}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* DESKTOP FLOATING MAP TOOLBAR */}
+        {activeTab === "streets" && (
+          <div className="hidden md:flex absolute top-3 right-3 z-20 items-center gap-2 pointer-events-auto">
+            <button
+              onClick={handleTeleportToStart}
+              title="Teleport car back to start intersection"
+              className="px-3 py-1.5 rounded-xl bg-[#0f172a]/90 hover:bg-rose-950/80 border border-amber-500/50 hover:border-rose-500 text-amber-300 hover:text-rose-300 text-xs font-cyber font-bold backdrop-blur-md shadow-2xl flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+            >
+              <LifeBuoy className="w-4 h-4 text-amber-400" />
+              <span>HELP I'M STUCK</span>
+            </button>
+
+            <button
+              onClick={() => setShowWelcomeModal(true)}
+              title="View game instructions & controls guide"
+              className="px-3 py-1.5 rounded-xl bg-[#0f172a]/90 hover:bg-slate-800 border border-slate-700 hover:border-amber-400 text-slate-300 hover:text-amber-300 text-xs font-cyber font-bold backdrop-blur-md shadow-2xl flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+            >
+              <HelpCircle className="w-4 h-4 text-amber-400" />
+              <span>GUIDE</span>
+            </button>
+          </div>
+        )}
         
         {/* ACTIVE TOAST NOTIFICATION POPUP */}
         {toast && (
-          <div className="absolute top-24 left-1/2 transform -translate-x-1/2 z-50 pointer-events-none">
+          <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-50 pointer-events-none">
             <div className={`px-4 py-2 rounded-lg border text-xs font-cyber font-bold tracking-wide shadow-2xl flex items-center gap-2 animate-bounce bg-[#0a0f1d]/95 ${
               toast.type === "success" ? "border-emerald-500/30 text-emerald-400" :
               toast.type === "error" ? "border-rose-500/30 text-rose-400" :
@@ -2224,90 +2752,9 @@ export default function App() {
           id="game-canvas-container"
         />
 
-        {/* ACTIVE STREETS PLAYTIME HUD */}
-        {activeTab === "streets" && (
-          <div className="absolute inset-0 z-10 pointer-events-none flex flex-col justify-between p-4">
-            
-            {/* Top HUD Card */}
-            <div className="w-full flex flex-col md:flex-row gap-4 justify-between items-start">
-              
-              <div className="bg-[#0f172a]/95 border-l-4 border-amber-500 rounded-r-xl p-4 max-w-xl shadow-2xl backdrop-blur-md pointer-events-auto flex flex-col gap-1.5 border border-slate-800/40">
-                <div className="flex items-center gap-2 justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-500 font-cyber flex items-center gap-1">
-                    <Trophy className="w-3 h-3 text-amber-500" /> ACTIVE VOCAB OBJECTIVE
-                  </span>
-                  <span className={`text-[9px] px-2 py-0.5 rounded font-cyber font-bold uppercase border ${
-                    activeWordObj?.difficulty === "Easy" ? "border-emerald-500/30 bg-emerald-950/20 text-emerald-400" :
-                    activeWordObj?.difficulty === "Medium" ? "border-amber-500/30 bg-amber-950/20 text-amber-400" :
-                    "border-rose-500/30 bg-rose-950/20 text-rose-400"
-                  }`}>
-                    {activeWordObj?.difficulty || "Medium"}
-                  </span>
-                </div>
-                <h2 className="text-sm text-slate-100 font-medium leading-relaxed font-cyber">
-                  {activeWordObj?.definition || "Select a word to practice"}
-                </h2>
-
-                {/* Spell Tracker Letters */}
-                <div className="flex items-center gap-3 mt-3 flex-wrap">
-                  <div className="flex flex-col gap-1 w-full">
-                    <div className="flex justify-between items-center text-[10px] text-slate-400 font-cyber">
-                      <span>LETTERS COLLECTED ({collectedLetters.length} / {activeWordObj?.word.length})</span>
-                      <span className="text-yellow-400 font-bold">Collect all to unscramble!</span>
-                    </div>
-                    <div className="flex gap-1.5 font-cyber font-bold text-lg">
-                      {Array.from({ length: activeWordObj?.word.length || 0 }).map((_, idx) => {
-                        const hasLetter = idx < collectedLetters.length;
-                        const letterObj = collectedLetters[idx];
-
-                        return (
-                          <span 
-                            key={idx} 
-                            className={`w-8 h-8 rounded border flex items-center justify-center transition-all ${
-                              hasLetter 
-                                ? "border-emerald-500 bg-emerald-950/35 text-emerald-400 font-black" 
-                                : "border-amber-500 bg-amber-500/10 text-amber-500 border-2 animate-pulse"
-                            }`}
-                          >
-                            {hasLetter ? letterObj.char : "?"}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-
-              {/* HUD Instruction Quickcard */}
-              <div className="hidden lg:flex bg-[#0f172a]/90 border border-slate-800 rounded-xl p-3 shadow-xl backdrop-blur-md items-center gap-3.5 text-xs text-slate-300 pointer-events-auto max-w-xs leading-relaxed">
-                <div className="p-2 bg-slate-800 rounded-lg text-cyan-400 font-cyber font-bold shrink-0">
-                  W A S D
-                </div>
-                <div>
-                  <span className="font-cyber font-bold text-white text-[10px] block uppercase tracking-wider text-cyan-400">Drive Controls</span>
-                  Accelerate & steer around grid building blocks. Trace floating orange glowing letters to spell words.
-                </div>
-              </div>
-
-            </div>
-
-            {/* Bottom Speed HUD Telemetry */}
-            <div className="flex justify-between items-end">
-              <div className="bg-[#0f172a]/95 border border-slate-800 rounded-xl px-4 py-2.5 flex items-center gap-4.5 backdrop-blur-md pointer-events-auto font-cyber shadow-2xl">
-                <div className="flex flex-col">
-                  <span className="text-[8px] text-slate-400 uppercase tracking-widest font-bold">CAR SPECS</span>
-                  <span className="text-xs font-bold" style={{ color: activeCarSpec.colorStr }}>{activeCarSpec.name}</span>
-                </div>
-                <div className="h-6 w-px bg-slate-800"></div>
-                <div className="flex items-baseline gap-0.5">
-                  <span className="text-xl font-bold text-white">{carSpeed}</span>
-                  <span className="text-[9px] text-slate-400">MPH</span>
-                </div>
-              </div>
-            </div>
-
-          </div>
+        {/* RESPONSIVE MOBILE TOUCH JOYSTICK & ACTION BUTTONS */}
+        {activeTab === "streets" && showTouchControls && (
+          <TouchJoystickControls onHonk={() => playAudioSynth("honk")} />
         )}
 
         {/* INTERACTIVE UNSCRAMBLE MINI-GAME OVERLAY */}
@@ -2727,6 +3174,112 @@ export default function App() {
                   </div>
                 </div>
 
+              </div>
+
+            </div>
+          </div>
+        )}
+
+        {/* WELCOME GAME LOOP & CONTROLS POP-UP MODAL */}
+        {showWelcomeModal && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-[#0b101d] border-2 border-amber-500/80 rounded-2xl max-w-xl w-full shadow-[0_0_40px_rgba(245,158,11,0.3)] overflow-hidden my-auto flex flex-col font-sans">
+              
+              {/* Header */}
+              <div className="p-5 border-b border-slate-800 bg-gradient-to-r from-[#111827] to-[#1a233a] flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/50 flex items-center justify-center shrink-0">
+                    <Car className="w-6 h-6 text-amber-400" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-cyber font-black tracking-widest uppercase text-amber-400 block">
+                      RETRO CYBERPUNK VOCAB RUN
+                    </span>
+                    <h2 className="text-lg sm:text-xl font-cyber font-black text-white tracking-wider">
+                      WELCOME TO IELTS DRIVER
+                    </h2>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => {
+                    playAudioSynth("pickup");
+                    setShowWelcomeModal(false);
+                  }}
+                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                  title="Close Guide"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="p-5 sm:p-6 flex flex-col gap-4 text-slate-200 text-xs sm:text-sm max-h-[75vh] overflow-y-auto">
+                
+                {/* Game Loop Explanation */}
+                <div className="bg-[#070b14] p-4 rounded-xl border border-amber-500/30 flex flex-col gap-2.5">
+                  <div className="flex items-center gap-2 text-amber-400 font-cyber font-bold text-xs uppercase tracking-wider">
+                    <Trophy className="w-4 h-4 text-amber-400" />
+                    <span>HOW TO PLAY (GAME LOOP)</span>
+                  </div>
+
+                  <ol className="list-decimal list-inside space-y-1.5 text-slate-300 font-sans leading-relaxed text-xs">
+                    <li><strong className="text-white">Drive the Streets</strong>: Cruise through the top-down retro city grid in your car.</li>
+                    <li><strong className="text-amber-300">Collect Letter Pickups</strong>: Run over the glowing orange letter markers on the roads to collect spelling letters for your active IELTS term.</li>
+                    <li><strong className="text-emerald-400">Unscramble & Earn Cash</strong>: Once all letters are collected, solve the spelling mini-game to earn cash rewards & unlock dictionary badges!</li>
+                    <li><strong className="text-cyan-300">Garage Upgrades</strong>: Spend cash to unlock high-performance supercars, limos, and custom paint finishes.</li>
+                  </ol>
+                </div>
+
+                {/* Controls Breakdown */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  
+                  {/* Joystick Controls */}
+                  <div className="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800 flex flex-col gap-2">
+                    <div className="flex items-center gap-2 text-amber-400 font-cyber font-bold text-xs">
+                      <Gamepad2 className="w-4 h-4 text-amber-400" />
+                      <span>ON-SCREEN JOYSTICK</span>
+                    </div>
+                    <p className="text-[11px] text-slate-300 leading-normal">
+                      Drag the <strong>virtual joystick</strong> on the bottom-left to steer in 360°. Tap <strong>GAS</strong> or <strong>BRAKE</strong> on the bottom-right to accelerate or reverse.
+                    </p>
+                  </div>
+
+                  {/* Keyboard Controls */}
+                  <div className="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800 flex flex-col gap-2">
+                    <div className="flex items-center gap-2 text-cyan-400 font-cyber font-bold text-xs">
+                      <Keyboard className="w-4 h-4 text-cyan-400" />
+                      <span>KEYBOARD CONTROLS</span>
+                    </div>
+                    <p className="text-[11px] text-slate-300 leading-normal">
+                      Use <strong>WASD</strong> or <strong>Arrow Keys</strong> to steer, accelerate, and reverse. Press <strong>Spacebar</strong> or tap <strong>HONK</strong> for horn.
+                    </p>
+                  </div>
+
+                </div>
+
+                {/* Teleport / Stuck Tip */}
+                <div className="bg-amber-950/20 p-3 rounded-xl border border-amber-500/30 flex items-center gap-3">
+                  <LifeBuoy className="w-5 h-5 text-amber-400 shrink-0" />
+                  <p className="text-[11px] text-amber-200/90 leading-tight">
+                    <strong>Trapped or stuck?</strong> Click the <strong>"Help I'm Stuck"</strong> button at any time to instantly teleport your car back to the starting road intersection!
+                  </p>
+                </div>
+
+              </div>
+
+              {/* Footer */}
+              <div className="p-4 border-t border-slate-800/80 bg-[#070b14] flex justify-end">
+                <button
+                  onClick={() => {
+                    playAudioSynth("pickup");
+                    setShowWelcomeModal(false);
+                  }}
+                  className="w-full sm:w-auto px-6 py-3 rounded-xl bg-gradient-to-r from-yellow-400 via-amber-500 to-amber-600 hover:from-yellow-300 hover:to-amber-500 text-slate-950 font-cyber font-black text-xs tracking-wider uppercase shadow-[0_0_20px_rgba(245,158,11,0.4)] hover:shadow-[0_0_30px_rgba(245,158,11,0.6)] transition-all transform active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Play className="w-4 h-4 fill-slate-950" />
+                  <span>START DRIVING NOW</span>
+                </button>
               </div>
 
             </div>
