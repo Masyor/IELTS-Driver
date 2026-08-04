@@ -310,7 +310,7 @@ const TouchJoystickControls = ({ onHonk }: { onHonk: () => void }) => {
   };
 
   return (
-    <div className="absolute inset-x-0 bottom-4 z-30 pointer-events-none px-4 flex justify-between items-end touch-none select-none">
+    <div className="absolute inset-x-0 bottom-12 sm:bottom-6 pb-[max(1rem,env(safe-area-inset-bottom))] z-30 pointer-events-none px-3 sm:px-6 flex justify-between items-end touch-none select-none">
       
       {/* JOYSTICK ON BOTTOM LEFT */}
       <div className="pointer-events-auto flex flex-col items-center gap-1">
@@ -993,8 +993,11 @@ export default function App() {
 
       onReactColorChange = (e: CustomEvent<{ carId: string; color: string }>) => {
         if (!this.sys || !this.sys.isActive()) return;
-        if (e && e.detail && e.detail.carId === this.currentCarId) {
-          this.syncCarStats(this.currentCarId, e.detail.color);
+        if (e && e.detail && e.detail.carId) {
+          this.drawCarCanvasTexture(e.detail.carId, e.detail.color);
+          if (e.detail.carId === this.currentCarId) {
+            this.syncCarStats(this.currentCarId, e.detail.color);
+          }
         }
       };
 
@@ -1023,6 +1026,244 @@ export default function App() {
         }
       };
 
+      drawCarCanvasTexture(carId: string, colorHex: string) {
+        if (!this.textures) return;
+
+        const texKey = "car_" + carId;
+        let canvasTex: any;
+
+        if (this.textures.exists(texKey)) {
+          canvasTex = this.textures.get(texKey);
+        } else {
+          const dims: Record<string, [number, number]> = {
+            rusty_banger: [36, 70],
+            fleet_sedan: [40, 78],
+            turbo_interceptor: [42, 82],
+            cyber_hypercar: [42, 84],
+            executive_limo: [42, 130],
+            chassis: [40, 80]
+          };
+          const [w, h] = dims[carId] || [40, 80];
+          canvasTex = this.textures.createCanvas(texKey, w, h);
+        }
+
+        if (!canvasTex || !canvasTex.context) return;
+        const ctx: CanvasRenderingContext2D = canvasTex.context;
+        const w = canvasTex.width;
+        const h = canvasTex.height;
+
+        ctx.clearRect(0, 0, w, h);
+
+        const drawRoundRect = (x: number, y: number, width: number, height: number, r: number) => {
+          if (typeof ctx.roundRect === "function") {
+            ctx.roundRect(x, y, width, height, r);
+          } else {
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + width - r, y);
+            ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+            ctx.lineTo(x + width, y + height - r);
+            ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+            ctx.lineTo(x + r, y + height);
+            ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+            ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+          }
+        };
+
+        if (carId === "rusty_banger") {
+          ctx.fillStyle = "#1e293b";
+          ctx.fillRect(1, 10, 5, 12);
+          ctx.fillRect(30, 10, 5, 12);
+          ctx.fillRect(1, 48, 5, 12);
+          ctx.fillRect(30, 48, 5, 12);
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = "#475569";
+          ctx.fillStyle = colorHex;
+          ctx.beginPath();
+          drawRoundRect(5, 6, 26, 58, 6);
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = "#92400e";
+          ctx.beginPath();
+          ctx.arc(10, 16, 2.5, 0, Math.PI * 2);
+          ctx.arc(24, 50, 3, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#0f172a";
+          ctx.fillRect(8, 22, 20, 20);
+          ctx.fillStyle = "#fef08a";
+          ctx.fillRect(8, 7, 4, 3);
+          ctx.fillRect(24, 7, 4, 3);
+          ctx.fillStyle = "#dc2626";
+          ctx.fillRect(8, 62, 5, 2);
+          ctx.fillRect(23, 62, 5, 2);
+        } else if (carId === "fleet_sedan") {
+          ctx.fillStyle = "#121212";
+          ctx.fillRect(2, 10, 5, 14);
+          ctx.fillRect(33, 10, 5, 14);
+          ctx.fillRect(2, 52, 5, 14);
+          ctx.fillRect(33, 52, 5, 14);
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = "#ffffff";
+          ctx.fillStyle = colorHex;
+          ctx.beginPath();
+          drawRoundRect(6, 6, 28, 66, 7);
+          ctx.fill();
+          ctx.stroke();
+          ctx.strokeStyle = "#cbd5e1";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(7, 39);
+          ctx.lineTo(33, 39);
+          ctx.stroke();
+          ctx.fillStyle = "#1e293b";
+          ctx.beginPath();
+          drawRoundRect(9, 22, 22, 28, 4);
+          ctx.fill();
+          ctx.fillStyle = "#f59e0b";
+          ctx.fillRect(13, 34, 14, 4);
+          ctx.fillStyle = "#fef08a";
+          ctx.beginPath();
+          ctx.arc(11, 8, 3, 0, Math.PI * 2);
+          ctx.arc(29, 8, 3, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#ef4444";
+          ctx.fillRect(10, 70, 6, 2);
+          ctx.fillRect(24, 70, 6, 2);
+        } else if (carId === "turbo_interceptor") {
+          ctx.fillStyle = "#020617";
+          ctx.fillRect(1, 12, 6, 15);
+          ctx.fillRect(35, 12, 6, 15);
+          ctx.fillRect(1, 53, 6, 15);
+          ctx.fillRect(35, 53, 6, 15);
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = "#ffffff";
+          ctx.fillStyle = colorHex;
+          ctx.beginPath();
+          drawRoundRect(6, 6, 30, 70, 10);
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = "#0f172a";
+          ctx.fillRect(17, 6, 3, 70);
+          ctx.fillRect(22, 6, 3, 70);
+          ctx.fillRect(12, 16, 4, 8);
+          ctx.fillRect(26, 16, 4, 8);
+          ctx.fillStyle = "#020617";
+          ctx.beginPath();
+          drawRoundRect(10, 28, 22, 22, 5);
+          ctx.fill();
+          ctx.fillStyle = "#020617";
+          ctx.strokeStyle = "#ffffff";
+          ctx.lineWidth = 1;
+          ctx.fillRect(5, 73, 32, 5);
+          ctx.strokeRect(5, 73, 32, 5);
+          ctx.fillStyle = "#38bdf8";
+          ctx.fillRect(10, 8, 5, 3);
+          ctx.fillRect(27, 8, 5, 3);
+          ctx.fillStyle = "#f43f5e";
+          ctx.fillRect(9, 74, 6, 2);
+          ctx.fillRect(27, 74, 6, 2);
+        } else if (carId === "cyber_hypercar") {
+          ctx.fillStyle = "#000000";
+          ctx.fillRect(1, 12, 5, 14);
+          ctx.fillRect(36, 12, 5, 14);
+          ctx.fillRect(1, 54, 5, 14);
+          ctx.fillRect(36, 54, 5, 14);
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = "#ffffff";
+          ctx.fillStyle = colorHex;
+          ctx.beginPath();
+          ctx.moveTo(21, 4);
+          ctx.lineTo(39, 20);
+          ctx.lineTo(41, 66);
+          ctx.lineTo(35, 80);
+          ctx.lineTo(7, 80);
+          ctx.lineTo(1, 66);
+          ctx.lineTo(3, 20);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = "#050b14";
+          ctx.beginPath();
+          ctx.moveTo(21, 20);
+          ctx.lineTo(33, 32);
+          ctx.lineTo(31, 52);
+          ctx.lineTo(11, 52);
+          ctx.lineTo(9, 32);
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = "#39ff14";
+          ctx.lineWidth = 2;
+          ctx.strokeRect(5, 26, 2, 34);
+          ctx.strokeRect(35, 26, 2, 34);
+          ctx.strokeStyle = "#00f0ff";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(10, 8);
+          ctx.lineTo(18, 6);
+          ctx.moveTo(32, 8);
+          ctx.lineTo(24, 6);
+          ctx.stroke();
+        } else if (carId === "executive_limo") {
+          ctx.fillStyle = "#0f172a";
+          ctx.fillRect(1, 16, 5, 15);
+          ctx.fillRect(36, 16, 5, 15);
+          ctx.fillRect(1, 98, 5, 15);
+          ctx.fillRect(36, 98, 5, 15);
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = "#fef08a";
+          ctx.fillStyle = colorHex;
+          ctx.beginPath();
+          drawRoundRect(6, 6, 30, 118, 8);
+          ctx.fill();
+          ctx.stroke();
+          ctx.strokeStyle = "#cbd5e1";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(8, 12);
+          ctx.lineTo(8, 118);
+          ctx.moveTo(34, 12);
+          ctx.lineTo(34, 118);
+          ctx.stroke();
+          ctx.fillStyle = "#020617";
+          ctx.fillRect(9, 22, 24, 16);
+          ctx.fillRect(9, 44, 24, 20);
+          ctx.fillRect(9, 68, 24, 20);
+          ctx.fillRect(9, 92, 24, 14);
+          ctx.fillStyle = "#f59e0b";
+          ctx.beginPath();
+          ctx.arc(21, 54, 2.5, 0, Math.PI * 2);
+          ctx.arc(21, 78, 2.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#cbd5e1";
+          ctx.fillRect(12, 7, 18, 3);
+          ctx.fillStyle = "#fef08a";
+          ctx.fillRect(9, 9, 4, 3);
+          ctx.fillRect(29, 9, 4, 3);
+        } else {
+          ctx.fillStyle = "#1e293b";
+          ctx.fillRect(2, 10, 5, 14);
+          ctx.fillRect(33, 10, 5, 14);
+          ctx.fillRect(2, 54, 5, 14);
+          ctx.fillRect(33, 54, 5, 14);
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = "#ffffff";
+          ctx.fillStyle = colorHex;
+          ctx.beginPath();
+          drawRoundRect(6, 6, 28, 68, 6);
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = "#0f172a";
+          ctx.fillRect(9, 22, 22, 22);
+          ctx.fillStyle = "#fef08a";
+          ctx.fillRect(9, 7, 4, 3);
+          ctx.fillRect(27, 7, 4, 3);
+        }
+
+        canvasTex.refresh();
+      }
+
       syncCarStats(carId: string, customColorHex?: string) {
         if (!this.sys || !this.sys.isActive() || !this.textures) return;
         const spec = CAR_MODELS.find(c => c.id === carId) || CAR_MODELS[0];
@@ -1045,6 +1286,9 @@ export default function App() {
         const numColor = parseInt((activeHexStr || spec.colorStr).replace("#", ""), 16);
         this.carColor = isNaN(numColor) ? spec.color : numColor;
 
+        // Draw texture canvas directly in custom color
+        this.drawCarCanvasTexture(spec.id, activeHexStr || spec.colorStr);
+
         if (this.player) {
           const texName = "car_" + spec.id;
           if (this.textures.exists(texName)) {
@@ -1055,7 +1299,9 @@ export default function App() {
             this.player.setTexture("car_chassis");
           }
 
-          this.player.setTint(this.carColor);
+          if (!this.isStunned) {
+            this.player.clearTint();
+          }
           this.player.setAlpha(1.0);
           this.player.setVisible(true);
           this.player.setDepth(20);
@@ -1136,216 +1382,17 @@ export default function App() {
         sparkCtx.fillRect(0, 0, 10, 10);
         spark.refresh();
 
-        // 1. Rusty Banger (Toyota Hatchback style)
-        const banger = this.textures.createCanvas("car_rusty_banger", 36, 70);
-        const bCtx = banger.context;
-        bCtx.fillStyle = "#1e293b";
-        bCtx.fillRect(1, 10, 5, 12);
-        bCtx.fillRect(30, 10, 5, 12);
-        bCtx.fillRect(1, 48, 5, 12);
-        bCtx.fillRect(30, 48, 5, 12);
-        bCtx.lineWidth = 2;
-        bCtx.strokeStyle = "#475569";
-        bCtx.fillStyle = "#ffffff";
-        bCtx.beginPath();
-        drawRoundRect(bCtx, 5, 6, 26, 58, 6);
-        bCtx.fill();
-        bCtx.stroke();
-        bCtx.fillStyle = "#92400e";
-        bCtx.beginPath();
-        bCtx.arc(10, 16, 2.5, 0, Math.PI * 2);
-        bCtx.arc(24, 50, 3, 0, Math.PI * 2);
-        bCtx.fill();
-        bCtx.fillStyle = "#0f172a";
-        bCtx.fillRect(8, 22, 20, 20);
-        bCtx.fillStyle = "#fef08a";
-        bCtx.fillRect(8, 7, 4, 3);
-        bCtx.fillRect(24, 7, 4, 3);
-        bCtx.fillStyle = "#dc2626";
-        bCtx.fillRect(8, 62, 5, 2);
-        bCtx.fillRect(23, 62, 5, 2);
-        banger.refresh();
+        // Draw initial car textures with saved or default colors
+        let savedColors: Record<string, string> = {};
+        try {
+          savedColors = JSON.parse(localStorage.getItem("ielts_driver_car_colors") || "{}");
+        } catch (e) {}
 
-        // 2. Fleet Sedan
-        const sedan = this.textures.createCanvas("car_fleet_sedan", 40, 78);
-        const sCtx = sedan.context;
-        sCtx.fillStyle = "#121212";
-        sCtx.fillRect(2, 10, 5, 14);
-        sCtx.fillRect(33, 10, 5, 14);
-        sCtx.fillRect(2, 52, 5, 14);
-        sCtx.fillRect(33, 52, 5, 14);
-        sCtx.lineWidth = 2;
-        sCtx.strokeStyle = "#ffffff";
-        sCtx.fillStyle = "#ffffff";
-        sCtx.beginPath();
-        drawRoundRect(sCtx, 6, 6, 28, 66, 7);
-        sCtx.fill();
-        sCtx.stroke();
-        sCtx.strokeStyle = "#cbd5e1";
-        sCtx.lineWidth = 1.5;
-        sCtx.beginPath();
-        sCtx.moveTo(7, 39);
-        sCtx.lineTo(33, 39);
-        sCtx.stroke();
-        sCtx.fillStyle = "#1e293b";
-        sCtx.beginPath();
-        drawRoundRect(sCtx, 9, 22, 22, 28, 4);
-        sCtx.fill();
-        sCtx.fillStyle = "#f59e0b";
-        sCtx.fillRect(13, 34, 14, 4);
-        sCtx.fillStyle = "#fef08a";
-        sCtx.beginPath();
-        sCtx.arc(11, 8, 3, 0, Math.PI * 2);
-        sCtx.arc(29, 8, 3, 0, Math.PI * 2);
-        sCtx.fill();
-        sCtx.fillStyle = "#ef4444";
-        sCtx.fillRect(10, 70, 6, 2);
-        sCtx.fillRect(24, 70, 6, 2);
-        sedan.refresh();
-
-        // 3. Turbo Interceptor (Dodge Viper styling)
-        const interceptor = this.textures.createCanvas("car_turbo_interceptor", 42, 82);
-        const iCtx = interceptor.context;
-        iCtx.fillStyle = "#020617";
-        iCtx.fillRect(1, 12, 6, 15);
-        iCtx.fillRect(35, 12, 6, 15);
-        iCtx.fillRect(1, 53, 6, 15);
-        iCtx.fillRect(35, 53, 6, 15);
-        iCtx.lineWidth = 2;
-        iCtx.strokeStyle = "#ffffff";
-        iCtx.fillStyle = "#ffffff";
-        iCtx.beginPath();
-        drawRoundRect(iCtx, 6, 6, 30, 70, 10);
-        iCtx.fill();
-        iCtx.stroke();
-        iCtx.fillStyle = "#0f172a";
-        iCtx.fillRect(17, 6, 3, 70);
-        iCtx.fillRect(22, 6, 3, 70);
-        iCtx.fillRect(12, 16, 4, 8);
-        iCtx.fillRect(26, 16, 4, 8);
-        iCtx.fillStyle = "#020617";
-        iCtx.beginPath();
-        drawRoundRect(iCtx, 10, 28, 22, 22, 5);
-        iCtx.fill();
-        iCtx.fillStyle = "#020617";
-        iCtx.strokeStyle = "#ffffff";
-        iCtx.lineWidth = 1;
-        iCtx.fillRect(5, 73, 32, 5);
-        iCtx.strokeRect(5, 73, 32, 5);
-        iCtx.fillStyle = "#38bdf8";
-        iCtx.fillRect(10, 8, 5, 3);
-        iCtx.fillRect(27, 8, 5, 3);
-        iCtx.fillStyle = "#f43f5e";
-        iCtx.fillRect(9, 74, 6, 2);
-        iCtx.fillRect(27, 74, 6, 2);
-        interceptor.refresh();
-
-        // 4. Cyber Hypercar
-        const hypercar = this.textures.createCanvas("car_cyber_hypercar", 42, 84);
-        const hCtx = hypercar.context;
-        hCtx.fillStyle = "#000000";
-        hCtx.fillRect(1, 12, 5, 14);
-        hCtx.fillRect(36, 12, 5, 14);
-        hCtx.fillRect(1, 54, 5, 14);
-        hCtx.fillRect(36, 54, 5, 14);
-        hCtx.lineWidth = 2;
-        hCtx.strokeStyle = "#ffffff";
-        hCtx.fillStyle = "#ffffff";
-        hCtx.beginPath();
-        hCtx.moveTo(21, 4);
-        hCtx.lineTo(39, 20);
-        hCtx.lineTo(41, 66);
-        hCtx.lineTo(35, 80);
-        hCtx.lineTo(7, 80);
-        hCtx.lineTo(1, 66);
-        hCtx.lineTo(3, 20);
-        hCtx.closePath();
-        hCtx.fill();
-        hCtx.stroke();
-        hCtx.fillStyle = "#050b14";
-        hCtx.beginPath();
-        hCtx.moveTo(21, 20);
-        hCtx.lineTo(33, 32);
-        hCtx.lineTo(31, 52);
-        hCtx.lineTo(11, 52);
-        hCtx.lineTo(9, 32);
-        hCtx.closePath();
-        hCtx.fill();
-        hCtx.strokeStyle = "#39ff14";
-        hCtx.lineWidth = 2;
-        hCtx.strokeRect(5, 26, 2, 34);
-        hCtx.strokeRect(35, 26, 2, 34);
-        hCtx.strokeStyle = "#00f0ff";
-        hCtx.lineWidth = 2;
-        hCtx.beginPath();
-        hCtx.moveTo(10, 8);
-        hCtx.lineTo(18, 6);
-        hCtx.moveTo(32, 8);
-        hCtx.lineTo(24, 6);
-        hCtx.stroke();
-        hypercar.refresh();
-
-        // 5. Executive Limo
-        const limo = this.textures.createCanvas("car_executive_limo", 42, 130);
-        const lCtx = limo.context;
-        lCtx.fillStyle = "#0f172a";
-        lCtx.fillRect(1, 16, 5, 15);
-        lCtx.fillRect(36, 16, 5, 15);
-        lCtx.fillRect(1, 98, 5, 15);
-        lCtx.fillRect(36, 98, 5, 15);
-        lCtx.lineWidth = 2;
-        lCtx.strokeStyle = "#fef08a";
-        lCtx.fillStyle = "#ffffff";
-        lCtx.beginPath();
-        drawRoundRect(lCtx, 6, 6, 30, 118, 8);
-        lCtx.fill();
-        lCtx.stroke();
-        lCtx.strokeStyle = "#cbd5e1";
-        lCtx.lineWidth = 1.5;
-        lCtx.beginPath();
-        lCtx.moveTo(8, 12);
-        lCtx.lineTo(8, 118);
-        lCtx.moveTo(34, 12);
-        lCtx.lineTo(34, 118);
-        lCtx.stroke();
-        lCtx.fillStyle = "#020617";
-        lCtx.fillRect(9, 22, 24, 16);
-        lCtx.fillRect(9, 44, 24, 20);
-        lCtx.fillRect(9, 68, 24, 20);
-        lCtx.fillRect(9, 92, 24, 14);
-        lCtx.fillStyle = "#f59e0b";
-        lCtx.beginPath();
-        lCtx.arc(21, 54, 2.5, 0, Math.PI * 2);
-        lCtx.arc(21, 78, 2.5, 0, Math.PI * 2);
-        lCtx.fill();
-        lCtx.fillStyle = "#cbd5e1";
-        lCtx.fillRect(12, 7, 18, 3);
-        lCtx.fillStyle = "#fef08a";
-        lCtx.fillRect(9, 9, 4, 3);
-        lCtx.fillRect(29, 9, 4, 3);
-        limo.refresh();
-
-        // Default / Fallback Chassis Texture (Fully drawn white body, 40x80)
-        const chassis = this.textures.createCanvas("car_chassis", 40, 80);
-        const cCtx = chassis.context;
-        cCtx.fillStyle = "#1e293b";
-        cCtx.fillRect(2, 10, 5, 14);
-        cCtx.fillRect(33, 10, 5, 14);
-        cCtx.fillRect(2, 54, 5, 14);
-        cCtx.fillRect(33, 54, 5, 14);
-        cCtx.lineWidth = 2;
-        cCtx.strokeStyle = "#ffffff";
-        cCtx.fillStyle = "#ffffff";
-        cCtx.beginPath();
-        drawRoundRect(cCtx, 6, 6, 28, 68, 6);
-        cCtx.fill();
-        cCtx.stroke();
-        cCtx.fillStyle = "#0f172a";
-        cCtx.fillRect(9, 22, 22, 22);
-        cCtx.fillStyle = "#fef08a";
-        cCtx.fillRect(9, 7, 4, 3);
-        cCtx.fillRect(27, 7, 4, 3);
-        chassis.refresh();
+        CAR_MODELS.forEach(car => {
+          const hex = savedColors[car.id] || car.colorStr;
+          this.drawCarCanvasTexture(car.id, hex);
+        });
+        this.drawCarCanvasTexture("chassis", "#ffffff");
 
         // NPC Commuter Sedan
         const npc = this.textures.createCanvas("npc_chassis", 40, 75);
@@ -1357,7 +1404,7 @@ export default function App() {
         npcCtx.fillRect(33, 50, 5, 12);
         npcCtx.lineWidth = 2;
         npcCtx.strokeStyle = "#ffffff";
-        npcCtx.fillStyle = "#ffffff"; // White canvas body so tinting applies clean colors!
+        npcCtx.fillStyle = "#ffffff";
         npcCtx.beginPath();
         drawRoundRect(npcCtx, 5, 5, 30, 65, 5);
         npcCtx.fill();
@@ -1750,7 +1797,7 @@ export default function App() {
         // Clear flashes
         if (this.isStunned && time > this.stunTimer) {
           this.isStunned = false;
-          this.player.setTint(this.carColor);
+          this.player.clearTint();
         }
 
         // Run obstacle detection for all NPCs before handling movement
