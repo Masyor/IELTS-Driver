@@ -16,7 +16,10 @@ import {
   LifeBuoy,
   Keyboard,
   X,
-  Navigation
+  Navigation,
+  Download,
+  Maximize2,
+  Minimize2
 } from "lucide-react";
 import { IELTS_WORDS, IELTSWord } from "./data/words";
 import { CAR_MODELS, CarModel } from "./data/cars";
@@ -496,6 +499,77 @@ export default function App() {
       return () => clearTimeout(timer);
     }
   }, [toast]);
+
+  // Fullscreen state and handler
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement && !(document as any).webkitFullscreenElement) {
+      const docEl = document.documentElement as any;
+      if (docEl.requestFullscreen) {
+        docEl.requestFullscreen().catch(() => {});
+      } else if (docEl.webkitRequestFullscreen) {
+        docEl.webkitRequestFullscreen().catch(() => {});
+      } else if (docEl.msRequestFullscreen) {
+        docEl.msRequestFullscreen().catch(() => {});
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      } else if ((document as any).webkitExitFullscreen) {
+        (document as any).webkitExitFullscreen().catch(() => {});
+      }
+    }
+  };
+
+  // Auto-fullscreen on load and gesture
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!(document.fullscreenElement || (document as any).webkitFullscreenElement));
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+
+    const triggerAutoFullscreen = () => {
+      if (!document.fullscreenElement && !(document as any).webkitFullscreenElement) {
+        const docEl = document.documentElement as any;
+        if (docEl.requestFullscreen) {
+          docEl.requestFullscreen().catch(() => {});
+        } else if (docEl.webkitRequestFullscreen) {
+          docEl.webkitRequestFullscreen().catch(() => {});
+        }
+      }
+    };
+
+    triggerAutoFullscreen();
+
+    window.addEventListener("click", triggerAutoFullscreen, { once: true });
+    window.addEventListener("pointerdown", triggerAutoFullscreen, { once: true });
+    window.addEventListener("keydown", triggerAutoFullscreen, { once: true });
+
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+      window.removeEventListener("click", triggerAutoFullscreen);
+      window.removeEventListener("pointerdown", triggerAutoFullscreen);
+      window.removeEventListener("keydown", triggerAutoFullscreen);
+    };
+  }, []);
+
+  // Export vocabulary list as separate JSON file download
+  const handleExportVocabJSON = () => {
+    const jsonString = JSON.stringify(IELTS_WORDS, null, 2);
+    const blob = new Blob([jsonString], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "ielts_vocab_list.json";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    triggerToast("📥 Exported vocabulary list to ielts_vocab_list.json!", "success");
+  };
 
   // Unscramble Timer tracker
   useEffect(() => {
@@ -2460,8 +2534,24 @@ export default function App() {
           </span>
         </div>
 
-        {/* Mobile Navigation Buttons */}
+        {/* Mobile Navigation & Utility Buttons */}
         <div className="flex items-center gap-1">
+          <button
+            onClick={toggleFullscreen}
+            className="p-1 rounded-lg text-[10px] font-bold bg-slate-900 text-amber-400 border border-slate-800 hover:border-amber-500/50 transition-all cursor-pointer"
+            title="Toggle Fullscreen"
+          >
+            {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+          </button>
+
+          <button
+            onClick={handleExportVocabJSON}
+            className="p-1 rounded-lg text-[10px] font-bold bg-slate-900 text-amber-400 border border-slate-800 hover:border-amber-500/50 transition-all cursor-pointer"
+            title="Export Vocab JSON"
+          >
+            <Download className="w-3.5 h-3.5" />
+          </button>
+
           <button
             onClick={() => setActiveTab("streets")}
             className={`px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
@@ -2636,8 +2726,26 @@ export default function App() {
               </span>
             </button>
 
-            {/* Help & Guide Buttons */}
+            {/* Action & Utility Buttons */}
             <div className="grid grid-cols-2 gap-2 mt-0.5">
+              <button
+                onClick={toggleFullscreen}
+                className="py-1.5 px-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-amber-500/50 text-slate-300 hover:text-amber-300 text-[10px] font-cyber font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                title="Toggle Fullscreen mode"
+              >
+                {isFullscreen ? <Minimize2 className="w-3.5 h-3.5 text-amber-400" /> : <Maximize2 className="w-3.5 h-3.5 text-amber-400" />}
+                <span>{isFullscreen ? "EXIT FULLSCREEN" : "FULLSCREEN"}</span>
+              </button>
+
+              <button
+                onClick={handleExportVocabJSON}
+                className="py-1.5 px-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-amber-500/50 text-slate-300 hover:text-amber-300 text-[10px] font-cyber font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                title="Export vocabulary JSON file"
+              >
+                <Download className="w-3.5 h-3.5 text-amber-400" />
+                <span>EXPORT JSON</span>
+              </button>
+
               <button
                 onClick={handleTeleportToStart}
                 className="py-1.5 px-2 rounded-lg bg-rose-950/20 hover:bg-rose-900/40 border border-amber-500/40 hover:border-rose-500/80 text-amber-300 hover:text-rose-300 text-[10px] font-cyber font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
@@ -3160,12 +3268,22 @@ export default function App() {
                   <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></div>
                   <h2 className="text-base font-cyber font-bold text-amber-400 tracking-wider">ACADEMIC VOCABULARY BANK</h2>
                 </div>
-                <button 
-                  onClick={() => setActiveTab("streets")} 
-                  className="px-3 py-1 bg-slate-800 border border-slate-700 hover:bg-slate-700 hover:border-slate-600 rounded-lg text-xs font-cyber cursor-pointer text-slate-300 hover:text-white"
-                >
-                  Return to Streets Run
-                </button>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={handleExportVocabJSON} 
+                    className="px-3 py-1 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 rounded-lg text-xs font-cyber cursor-pointer text-amber-300 hover:text-white flex items-center gap-1.5 transition-all"
+                    title="Export full vocabulary list as JSON file"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Export JSON</span>
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab("streets")} 
+                    className="px-3 py-1 bg-slate-800 border border-slate-700 hover:bg-slate-700 hover:border-slate-600 rounded-lg text-xs font-cyber cursor-pointer text-slate-300 hover:text-white"
+                  >
+                    Return to Streets Run
+                  </button>
+                </div>
               </div>
 
               <div className="p-6 overflow-y-auto flex-grow flex flex-col md:flex-row gap-6">
@@ -3320,6 +3438,9 @@ export default function App() {
                 <button
                   onClick={() => {
                     playAudioSynth("pickup");
+                    if (!document.fullscreenElement && !(document as any).webkitFullscreenElement) {
+                      toggleFullscreen();
+                    }
                     setShowWelcomeModal(false);
                   }}
                   className="w-full sm:w-auto px-6 py-3 rounded-xl bg-gradient-to-r from-yellow-400 via-amber-500 to-amber-600 hover:from-yellow-300 hover:to-amber-500 text-slate-950 font-cyber font-black text-xs tracking-wider uppercase shadow-[0_0_20px_rgba(245,158,11,0.4)] hover:shadow-[0_0_30px_rgba(245,158,11,0.6)] transition-all transform active:scale-95 cursor-pointer flex items-center justify-center gap-2"
