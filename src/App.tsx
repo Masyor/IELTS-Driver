@@ -463,46 +463,75 @@ export default function App() {
   const [wordsList, setWordsList] = useState<IELTSWord[]>(DEFAULT_WORDS);
   const [activeListName, setActiveListName] = useState<string>("default");
 
-  // Check for URL query parameter to load custom vocabulary list (e.g. ?vocab=medical or ?list=business)
+  // Check for URL query parameter to load custom vocabulary list (e.g. ?vocab=pipeline or ?list=business)
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
     const vocabQuery = searchParams.get("vocab") || searchParams.get("list") || searchParams.get("data");
 
     if (vocabQuery) {
-      let targetUrl = vocabQuery.trim();
-      if (!targetUrl.startsWith("http://") && !targetUrl.startsWith("https://") && !targetUrl.startsWith("/")) {
-        if (!targetUrl.endsWith(".json")) {
-          targetUrl = `/data/${targetUrl}.json`;
-        } else {
-          targetUrl = `/data/${targetUrl}`;
+      let queryVal = vocabQuery.trim();
+      let candidates: string[] = [];
+
+      if (queryVal.startsWith("http://") || queryVal.startsWith("https://")) {
+        candidates.push(queryVal);
+      } else {
+        let cleanName = queryVal.replace(/^\/+/, "");
+        if (!cleanName.endsWith(".json")) {
+          cleanName = `${cleanName}.json`;
         }
+        if (!cleanName.startsWith("data/")) {
+          cleanName = `data/${cleanName}`;
+        }
+
+        // Relative to current page (crucial for GitHub Pages /IELTS-Driver/ subpath!)
+        candidates.push(`./${cleanName}`);
+        
+        // Base URL from Vite if configured
+        const baseUrl = (import.meta as any).env?.BASE_URL || "./";
+        const baseDir = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
+        candidates.push(`${baseDir}${cleanName}`);
+
+        // Relative without leading dot
+        candidates.push(cleanName);
+
+        // Absolute root fallback
+        candidates.push(`/${cleanName}`);
       }
 
-      fetch(targetUrl)
-        .then(res => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          return res.json();
-        })
-        .then((data: any[]) => {
-          if (Array.isArray(data) && data.length > 0) {
-            const sanitized: IELTSWord[] = data.map((item: any, idx: number) => ({
-              word: String(item.word || item.term || `WORD_${idx}`).trim().toUpperCase(),
-              definition: String(item.definition || item.meaning || "No definition provided.").trim(),
-              category: (item.category as any) || "General",
-              difficulty: (item.difficulty as any) || "Medium",
-              example: String(item.example || item.sentence || "").trim()
-            }));
-            setWordsList(sanitized);
-            setIELTSWords(sanitized);
-            setActiveListName(vocabQuery);
-            triggerToast(`📚 Loaded vocabulary list: "${vocabQuery}" (${sanitized.length} terms)`, "success");
-            
-            // Safely select first word in new list
-            setActiveWordIndex(0);
-            window.dispatchEvent(new CustomEvent("react-word-changed", { detail: 0 }));
-          } else {
-            throw new Error("JSON is empty or not an array");
+      const tryFetchCandidates = async () => {
+        for (const url of candidates) {
+          try {
+            const res = await fetch(url);
+            if (res.ok) {
+              const data = await res.json();
+              if (Array.isArray(data) && data.length > 0) {
+                return { data, url };
+              }
+            }
+          } catch (e) {
+            // continue to next candidate
           }
+        }
+        throw new Error(`All candidate paths for "${vocabQuery}" failed.`);
+      };
+
+      tryFetchCandidates()
+        .then(({ data }) => {
+          const sanitized: IELTSWord[] = data.map((item: any, idx: number) => ({
+            word: String(item.word || item.term || `WORD_${idx}`).trim().toUpperCase(),
+            definition: String(item.definition || item.meaning || "No definition provided.").trim(),
+            category: (item.category as any) || "General",
+            difficulty: (item.difficulty as any) || "Medium",
+            example: String(item.example || item.sentence || "").trim()
+          }));
+          setWordsList(sanitized);
+          setIELTSWords(sanitized);
+          setActiveListName(vocabQuery);
+          triggerToast(`📚 Loaded vocabulary list: "${vocabQuery}" (${sanitized.length} terms)`, "success");
+          
+          // Safely select first word in new list
+          setActiveWordIndex(0);
+          window.dispatchEvent(new CustomEvent("react-word-changed", { detail: 0 }));
         })
         .catch(err => {
           console.warn(`Could not load custom vocabulary list "${vocabQuery}":`, err);
