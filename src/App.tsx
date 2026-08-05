@@ -17,6 +17,7 @@ import {
   Keyboard,
   X,
   Navigation,
+  Smartphone,
   Maximize2,
   Minimize2
 } from "lucide-react";
@@ -222,7 +223,9 @@ export const CarPreviewSvg = ({ carId, color, className = "w-24 h-40" }: { carId
 const TouchSteeringWheelControls = ({ onHonk }: { onHonk: () => void }) => {
   const wheelRef = useRef<HTMLDivElement>(null);
   const [steerVal, setSteerVal] = useState(0); // -1.0 to 1.0
-  const [isDraggingWheel, setIsDraggingWheel] = useState(false);
+  const [isSteering, setIsSteering] = useState(false);
+  const [dragStartX, setDragStartX] = useState(0);
+  const [isWheelDirect, setIsWheelDirect] = useState(false);
   const [gasPressed, setGasPressed] = useState(false);
   const [brakePressed, setBrakePressed] = useState(false);
 
@@ -237,36 +240,49 @@ const TouchSteeringWheelControls = ({ onHonk }: { onHonk: () => void }) => {
     };
   };
 
-  const calculateSteer = (clientX: number) => {
-    if (!wheelRef.current) return 0;
-    const rect = wheelRef.current.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const maxRadius = rect.width / 2 - 10;
-    const dx = clientX - centerX;
-    const clampedSteer = Math.max(-1, Math.min(1, dx / maxRadius));
-    return clampedSteer;
-  };
-
-  const handleWheelPointerDown = (e: React.PointerEvent) => {
+  const handlePointerDownScreen = (e: React.PointerEvent) => {
     e.preventDefault();
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    setIsDraggingWheel(true);
-    const newSteer = calculateSteer(e.clientX);
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    setIsSteering(true);
+
+    if (wheelRef.current && wheelRef.current.contains(e.target as Node)) {
+      setIsWheelDirect(true);
+      const rect = wheelRef.current.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const maxR = rect.width / 2 - 10;
+      const newSteer = Math.max(-1, Math.min(1, (e.clientX - centerX) / maxR));
+      setSteerVal(newSteer);
+      const throttle = gasPressed ? 1 : brakePressed ? -1 : 0;
+      updateTouchControls(newSteer, throttle);
+    } else {
+      setIsWheelDirect(false);
+      setDragStartX(e.clientX);
+      setSteerVal(0);
+      const throttle = gasPressed ? 1 : brakePressed ? -1 : 0;
+      updateTouchControls(0, throttle);
+    }
+  };
+
+  const handlePointerMoveScreen = (e: React.PointerEvent) => {
+    if (!isSteering) return;
+    let newSteer = 0;
+    if (isWheelDirect && wheelRef.current) {
+      const rect = wheelRef.current.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const maxR = rect.width / 2 - 10;
+      newSteer = Math.max(-1, Math.min(1, (e.clientX - centerX) / maxR));
+    } else {
+      const dx = e.clientX - dragStartX;
+      newSteer = Math.max(-1, Math.min(1, dx / 55));
+    }
     setSteerVal(newSteer);
     const throttle = gasPressed ? 1 : brakePressed ? -1 : 0;
     updateTouchControls(newSteer, throttle);
   };
 
-  const handleWheelPointerMove = (e: React.PointerEvent) => {
-    if (!isDraggingWheel) return;
-    const newSteer = calculateSteer(e.clientX);
-    setSteerVal(newSteer);
-    const throttle = gasPressed ? 1 : brakePressed ? -1 : 0;
-    updateTouchControls(newSteer, throttle);
-  };
-
-  const handleWheelPointerUp = (e: React.PointerEvent) => {
-    setIsDraggingWheel(false);
+  const handlePointerUpScreen = (e: React.PointerEvent) => {
+    setIsSteering(false);
+    setIsWheelDirect(false);
     setSteerVal(0);
     const throttle = gasPressed ? 1 : brakePressed ? -1 : 0;
     updateTouchControls(0, throttle);
@@ -274,43 +290,53 @@ const TouchSteeringWheelControls = ({ onHonk }: { onHonk: () => void }) => {
 
   const handleGasDown = (e: React.SyntheticEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setGasPressed(true);
     updateTouchControls(steerVal, 1);
   };
 
   const handleGasUp = (e: React.SyntheticEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setGasPressed(false);
     updateTouchControls(steerVal, brakePressed ? -1 : 0);
   };
 
   const handleBrakeDown = (e: React.SyntheticEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setBrakePressed(true);
     updateTouchControls(steerVal, -1);
   };
 
   const handleBrakeUp = (e: React.SyntheticEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setBrakePressed(false);
     updateTouchControls(steerVal, gasPressed ? 1 : 0);
   };
 
+  const handleHonkClick = (e: React.SyntheticEvent) => {
+    e.stopPropagation();
+    onHonk();
+  };
+
   return (
-    <div className="absolute inset-x-0 bottom-2 sm:bottom-6 pb-[max(0.5rem,env(safe-area-inset-bottom))] z-30 pointer-events-none px-2 sm:px-6 flex justify-between items-end touch-none select-none">
-      
+    <div 
+      onPointerDown={handlePointerDownScreen}
+      onPointerMove={handlePointerMoveScreen}
+      onPointerUp={handlePointerUpScreen}
+      onPointerCancel={handlePointerUpScreen}
+      className="absolute inset-0 z-30 pointer-events-auto touch-none select-none flex justify-between items-end pb-[max(0.5rem,env(safe-area-inset-bottom))] p-2 sm:p-6"
+    >
       {/* STEERING WHEEL CONTROL ON BOTTOM LEFT */}
-      <div className="pointer-events-auto flex flex-col items-center gap-1">
+      <div className="flex flex-col items-center gap-1">
         <span className="text-[9px] font-cyber font-bold text-amber-400 uppercase tracking-widest bg-slate-950/90 px-2 py-0.5 rounded border border-amber-500/30 shadow-md">
           STEERING WHEEL
         </span>
 
         <div
           ref={wheelRef}
-          onPointerDown={handleWheelPointerDown}
-          onPointerMove={handleWheelPointerMove}
-          onPointerUp={handleWheelPointerUp}
-          onPointerCancel={handleWheelPointerUp}
           className="w-32 h-32 sm:w-40 sm:h-36 rounded-2xl bg-slate-950/90 border-2 border-amber-500/60 backdrop-blur-md flex flex-col items-center justify-center relative shadow-[0_0_25px_rgba(245,158,11,0.25)] touch-none p-2"
         >
           {/* Top Directional Labels */}
@@ -354,8 +380,10 @@ const TouchSteeringWheelControls = ({ onHonk }: { onHonk: () => void }) => {
       </div>
 
       {/* ACTION BUTTONS STACKED VERTICALLY ON BOTTOM RIGHT */}
-      <div className="pointer-events-auto flex flex-col items-center gap-1.5">
-        
+      <div 
+        onPointerDown={(e) => e.stopPropagation()}
+        className="flex flex-col items-center gap-1.5"
+      >
         {/* 1. GAS BUTTON */}
         <button
           onPointerDown={handleGasDown}
@@ -388,14 +416,13 @@ const TouchSteeringWheelControls = ({ onHonk }: { onHonk: () => void }) => {
 
         {/* 3. HONK BUTTON */}
         <button
-          onClick={onHonk}
+          onClick={handleHonkClick}
+          onPointerDown={(e) => e.stopPropagation()}
           className="w-16 h-10 sm:w-20 sm:h-11 rounded-xl bg-amber-950/90 border-2 border-amber-400 text-amber-300 font-cyber font-black text-[10px] uppercase shadow-lg flex items-center justify-center active:scale-90 transition-transform cursor-pointer"
         >
           HONK
         </button>
-
       </div>
-
     </div>
   );
 };
@@ -2583,13 +2610,9 @@ export default function App() {
           {/* Brand Decal */}
           <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-[#111215]">
             <div className="flex flex-col">
-              <span className="text-[10px] tracking-widest text-amber-500 font-bold uppercase font-cyber">Career Vocational Driving</span>
-              <h1 className="text-xl font-cyber font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-500 tracking-tight leading-none mt-0.5">
+              <h1 className="text-xl font-cyber font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-500 tracking-tight leading-none">
                 IELTS <span className="text-white">DRIVER</span>
               </h1>
-            </div>
-            <div className="px-2 py-1 bg-amber-950/40 border border-amber-500/30 rounded text-amber-400 text-[10px] font-cyber font-bold animate-pulse">
-              V8 ENGINE
             </div>
           </div>
 
@@ -3367,10 +3390,10 @@ export default function App() {
                   <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 flex flex-col gap-1">
                     <div className="flex items-center gap-1.5 text-amber-400 font-cyber font-bold text-xs">
                       <Gamepad2 className="w-3.5 h-3.5 text-amber-400" />
-                      <span>STEERING WHEEL & PEDALS</span>
+                      <span>STEERING WHEEL & TOUCH</span>
                     </div>
                     <p className="text-[10px] sm:text-[11px] text-slate-300 leading-tight">
-                      Slide or drag the <strong>steering wheel</strong> on the left to turn. Tap <strong>GAS</strong>, <strong>BRAKE</strong>, or <strong>HONK</strong> stacked on the right.
+                      Slide or drag the <strong>steering wheel</strong> on the left — or slide left/right <strong>anywhere on screen</strong> — to turn! Tap <strong>GAS</strong> or <strong>BRAKE</strong> on the right.
                     </p>
                   </div>
 
@@ -3385,6 +3408,14 @@ export default function App() {
                     </p>
                   </div>
 
+                </div>
+
+                {/* Mobile Portrait Tip */}
+                <div className="bg-cyan-950/20 p-2 sm:p-2.5 rounded-xl border border-cyan-500/30 flex items-center gap-2">
+                  <Smartphone className="w-4 h-4 text-cyan-400 shrink-0" />
+                  <p className="text-[10px] sm:text-[11px] text-cyan-200/90 leading-tight">
+                    <strong>Mobile Orientation Tip:</strong> On mobile devices, this game works best when played in <strong>Portrait Mode</strong>!
+                  </p>
                 </div>
 
                 {/* Teleport / Stuck Tip */}
