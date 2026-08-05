@@ -8,5 +8,13 @@ export interface IELTSWord {
   example: string;
 }
 
-export const IELTS_WORDS: IELTSWord[] = vocabData as IELTSWord[];
+export const DEFAULT_WORDS: IELTSWord[] = vocabData as IELTSWord[];
+
+export let IELTS_WORDS: IELTSWord[] = [...DEFAULT_WORDS];
+
+export const setIELTSWords = (newWords: IELTSWord[]) => {
+  if (Array.isArray(newWords) && newWords.length > 0) {
+    IELTS_WORDS = newWords;
+  }
+};
 

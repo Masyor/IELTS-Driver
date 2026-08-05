@@ -1,0 +1,30 @@
+[
+  {
+    "word": "PIPELINE",
+    "definition": "A meeting where the ACE team reviews work, discusses current status and bottlenecks, and agrees on next actions to move items toward completion.",
+    "category": "Business",
+    "difficulty": "Medium",
+    "example": "The pipeline meeting this year will be at the Novotel hotel in BKK1"
+  },
+  {
+    "word": "REMEDIAL",
+    "definition": "Designed to help students who are struggling to achieve expected competencies in core academic skills. These classes provide extra support to improve performance in specific subjects for students who have fallen behind their peers.",
+    "category": "Academic",
+    "difficulty": "Easy",
+    "example": "I failed GEP 8 so I am signing up for remedial class"
+  },
+  {
+    "word": "PASSRATE",
+    "definition": "The percentage of individuals who successfully meet the required standards in an exam or assessment, indicating how many students passed compared to the total number who took the test",
+    "category": "Academic",
+    "difficulty": "Medium",
+    "example": "Pass rates have increased this term!"
+  },
+  {
+    "word": "RETENTION",
+    "definition": "The ability to keep employees or customers within an organization.",
+    "category": "Business",
+    "difficulty": "Easy",
+    "example": "Staff retention has increased since we started giving them free food."
+  }
+]

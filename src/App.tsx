@@ -21,7 +21,7 @@ import {
   Maximize2,
   Minimize2
 } from "lucide-react";
-import { IELTS_WORDS, IELTSWord } from "./data/words";
+import { DEFAULT_WORDS, IELTS_WORDS, IELTSWord, setIELTSWords } from "./data/words";
 import { CAR_MODELS, CarModel } from "./data/cars";
 
 // Declare Phaser as global constant from CDN script
@@ -379,24 +379,31 @@ const TouchSteeringWheelControls = ({ onHonk }: { onHonk: () => void }) => {
         </div>
       </div>
 
-      {/* ACTION BUTTONS STACKED VERTICALLY ON BOTTOM RIGHT */}
+      {/* ACTION BUTTONS STACKED VERTICALLY ON BOTTOM RIGHT WITH CLEARANCE BUFFER */}
       <div 
         onPointerDown={(e) => e.stopPropagation()}
-        className="flex flex-col items-center gap-1.5"
+        onPointerMove={(e) => e.stopPropagation()}
+        onPointerUp={(e) => e.stopPropagation()}
+        onPointerCancel={(e) => e.stopPropagation()}
+        className="pointer-events-auto bg-slate-950/60 border border-amber-500/30 rounded-2xl p-2.5 sm:p-3.5 backdrop-blur-md shadow-2xl flex flex-col items-center gap-2"
       >
+        <span className="text-[8px] sm:text-[9px] font-cyber font-bold text-slate-400 uppercase tracking-wider">
+          PEDALS
+        </span>
+
         {/* 1. GAS BUTTON */}
         <button
           onPointerDown={handleGasDown}
           onPointerUp={handleGasUp}
           onPointerCancel={handleGasUp}
-          className={`w-16 h-14 sm:w-20 sm:h-16 rounded-xl border-2 font-cyber font-black text-xs uppercase flex flex-col items-center justify-center shadow-xl transition-all active:scale-95 cursor-pointer ${
+          className={`w-20 h-16 sm:w-24 sm:h-20 rounded-xl border-2 font-cyber font-black text-xs sm:text-sm uppercase flex flex-col items-center justify-center shadow-xl transition-all active:scale-95 cursor-pointer ${
             gasPressed 
               ? "bg-emerald-500 border-white text-slate-950 shadow-emerald-400/50 scale-95" 
-              : "bg-emerald-950/80 border-emerald-400 text-emerald-300"
+              : "bg-emerald-950/90 border-emerald-400 text-emerald-300"
           }`}
         >
-          <Zap className="w-4 h-4 mb-0.5" />
-          <span className="text-[10px] sm:text-xs leading-none">GAS</span>
+          <Zap className="w-5 h-5 mb-0.5" />
+          <span className="text-[11px] sm:text-xs leading-none">GAS</span>
         </button>
 
         {/* 2. BRAKE BUTTON */}
@@ -404,21 +411,21 @@ const TouchSteeringWheelControls = ({ onHonk }: { onHonk: () => void }) => {
           onPointerDown={handleBrakeDown}
           onPointerUp={handleBrakeUp}
           onPointerCancel={handleBrakeUp}
-          className={`w-16 h-12 sm:w-20 sm:h-14 rounded-xl border-2 font-cyber font-black text-xs uppercase flex flex-col items-center justify-center shadow-xl transition-all active:scale-95 cursor-pointer ${
+          className={`w-20 h-14 sm:w-24 sm:h-16 rounded-xl border-2 font-cyber font-black text-xs sm:text-sm uppercase flex flex-col items-center justify-center shadow-xl transition-all active:scale-95 cursor-pointer ${
             brakePressed 
               ? "bg-rose-600 border-white text-white shadow-rose-500/50 scale-95" 
-              : "bg-rose-950/80 border-rose-500 text-rose-300"
+              : "bg-rose-950/90 border-rose-500 text-rose-300"
           }`}
         >
-          <span className="text-[10px] sm:text-xs leading-none">BRAKE</span>
-          <span className="text-[7px] opacity-80">REV</span>
+          <span className="text-[11px] sm:text-xs leading-none">BRAKE</span>
+          <span className="text-[8px] opacity-80">REV</span>
         </button>
 
         {/* 3. HONK BUTTON */}
         <button
           onClick={handleHonkClick}
           onPointerDown={(e) => e.stopPropagation()}
-          className="w-16 h-10 sm:w-20 sm:h-11 rounded-xl bg-amber-950/90 border-2 border-amber-400 text-amber-300 font-cyber font-black text-[10px] uppercase shadow-lg flex items-center justify-center active:scale-90 transition-transform cursor-pointer"
+          className="w-20 h-11 sm:w-24 sm:h-12 rounded-xl bg-amber-950/90 border-2 border-amber-400 text-amber-300 font-cyber font-black text-[11px] uppercase shadow-lg flex items-center justify-center active:scale-90 transition-transform cursor-pointer"
         >
           HONK
         </button>
@@ -451,6 +458,58 @@ export default function App() {
   const [activeWordIndex, setActiveWordIndex] = useState<number>(0);
   const [spelledText, setSpelledText] = useState<string>("");
   const [wordsSolvedCount, setWordsSolvedCount] = useState<number>(0);
+
+  // Vocabulary List state (supports dynamic loading via URL query params like ?vocab=medical or ?list=business)
+  const [wordsList, setWordsList] = useState<IELTSWord[]>(DEFAULT_WORDS);
+  const [activeListName, setActiveListName] = useState<string>("default");
+
+  // Check for URL query parameter to load custom vocabulary list (e.g. ?vocab=medical or ?list=business)
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const vocabQuery = searchParams.get("vocab") || searchParams.get("list") || searchParams.get("data");
+
+    if (vocabQuery) {
+      let targetUrl = vocabQuery.trim();
+      if (!targetUrl.startsWith("http://") && !targetUrl.startsWith("https://") && !targetUrl.startsWith("/")) {
+        if (!targetUrl.endsWith(".json")) {
+          targetUrl = `/data/${targetUrl}.json`;
+        } else {
+          targetUrl = `/data/${targetUrl}`;
+        }
+      }
+
+      fetch(targetUrl)
+        .then(res => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.json();
+        })
+        .then((data: any[]) => {
+          if (Array.isArray(data) && data.length > 0) {
+            const sanitized: IELTSWord[] = data.map((item: any, idx: number) => ({
+              word: String(item.word || item.term || `WORD_${idx}`).trim().toUpperCase(),
+              definition: String(item.definition || item.meaning || "No definition provided.").trim(),
+              category: (item.category as any) || "General",
+              difficulty: (item.difficulty as any) || "Medium",
+              example: String(item.example || item.sentence || "").trim()
+            }));
+            setWordsList(sanitized);
+            setIELTSWords(sanitized);
+            setActiveListName(vocabQuery);
+            triggerToast(`📚 Loaded vocabulary list: "${vocabQuery}" (${sanitized.length} terms)`, "success");
+            
+            // Safely select first word in new list
+            setActiveWordIndex(0);
+            window.dispatchEvent(new CustomEvent("react-word-changed", { detail: 0 }));
+          } else {
+            throw new Error("JSON is empty or not an array");
+          }
+        })
+        .catch(err => {
+          console.warn(`Could not load custom vocabulary list "${vocabQuery}":`, err);
+          triggerToast(`⚠️ List "${vocabQuery}" not found. Loaded default vocabulary list.`, "info");
+        });
+    }
+  }, []);
 
   // Unscrambling mini-game state (GTA 1 loop adaptation)
   const [collectedLetters, setCollectedLetters] = useState<{ index: number; char: string }[]>([]);
@@ -3299,10 +3358,19 @@ export default function App() {
 
                 {/* Right dictionary column */}
                 <div className="md:w-2/3 flex flex-col gap-3">
-                  <span className="text-[10px] font-cyber font-bold uppercase tracking-widest text-slate-400">Academic Word List ({IELTS_WORDS.length} terms)</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-cyber font-bold uppercase tracking-widest text-slate-400">
+                      Academic Word List ({wordsList.length} terms)
+                    </span>
+                    {activeListName !== "default" && (
+                      <span className="text-[9px] font-cyber font-bold uppercase px-2 py-0.5 rounded bg-amber-950/60 border border-amber-500/40 text-amber-400">
+                        URL DATASET: {activeListName}
+                      </span>
+                    )}
+                  </div>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto pr-2">
-                    {IELTS_WORDS.map((term, index) => {
+                    {wordsList.map((term, index) => {
                       const isActive = activeWordIndex === index;
 
                       return (
