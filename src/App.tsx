@@ -463,10 +463,63 @@ export default function App() {
   const [wordsList, setWordsList] = useState<IELTSWord[]>(DEFAULT_WORDS);
   const [activeListName, setActiveListName] = useState<string>("default");
 
-  // Check for URL query parameter to load custom vocabulary list (e.g. ?vocab=pipeline or ?list=business)
+  // Shuffle bag ref for non-repeating random word selection
+  const unplayedBagRef = useRef<number[]>([]);
+
+  // Function to get next random word index without repeats until all words in the list have been selected
+  const getNextRandomWordIndex = (list: IELTSWord[], currentIdx?: number): number => {
+    if (!list || list.length === 0) return 0;
+    if (list.length === 1) return 0;
+
+    // Filter existing bag items to ensure they are valid for current list length
+    let validBag = unplayedBagRef.current.filter(i => typeof i === "number" && i >= 0 && i < list.length);
+
+    // If bag is empty, refill with all indices [0, 1, ..., list.length - 1]
+    if (validBag.length === 0) {
+      validBag = Array.from({ length: list.length }, (_, i) => i);
+      // Avoid immediately repeating currentIdx as the first pick of a new bag if list has > 1 items
+      if (currentIdx !== undefined && list.length > 1) {
+        validBag = validBag.filter(i => i !== currentIdx);
+      }
+    }
+
+    // Pick a random index from validBag
+    const randPos = Math.floor(Math.random() * validBag.length);
+    const chosenWordIndex = validBag[randPos];
+
+    // Remove chosen word from validBag
+    const updatedBag = validBag.filter((_, idx) => idx !== randPos);
+
+    // If we excluded currentIdx when refilling, restore it for subsequent picks in the cycle
+    if (unplayedBagRef.current.length === 0 && currentIdx !== undefined && list.length > 1) {
+      if (!updatedBag.includes(currentIdx)) {
+        updatedBag.push(currentIdx);
+      }
+    }
+
+    unplayedBagRef.current = updatedBag;
+    try {
+      localStorage.setItem("ielts_driver_unplayed_bag", JSON.stringify(updatedBag));
+    } catch (e) {}
+
+    return chosenWordIndex;
+  };
+
+  // Check for URL query parameter OR stored custom vocabulary list on mount
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
     const vocabQuery = searchParams.get("vocab") || searchParams.get("list") || searchParams.get("data");
+
+    // Load unplayed bag from localstorage if available
+    try {
+      const savedBag = localStorage.getItem("ielts_driver_unplayed_bag");
+      if (savedBag) {
+        const parsed = JSON.parse(savedBag);
+        if (Array.isArray(parsed)) {
+          unplayedBagRef.current = parsed;
+        }
+      }
+    } catch (e) {}
 
     if (vocabQuery) {
       let queryVal = vocabQuery.trim();
@@ -499,9 +552,11 @@ export default function App() {
       }
 
       const tryFetchCandidates = async () => {
+        const timestamp = Date.now();
         for (const url of candidates) {
           try {
-            const res = await fetch(url);
+            const fetchUrl = url.includes("?") ? `${url}&v=${timestamp}` : `${url}?v=${timestamp}`;
+            const res = await fetch(fetchUrl, { cache: "no-store" });
             if (res.ok) {
               const data = await res.json();
               if (Array.isArray(data) && data.length > 0) {
@@ -524,19 +579,60 @@ export default function App() {
             difficulty: (item.difficulty as any) || "Medium",
             example: String(item.example || item.sentence || "").trim()
           }));
+          
           setWordsList(sanitized);
           setIELTSWords(sanitized);
           setActiveListName(vocabQuery);
-          triggerToast(`📚 Loaded vocabulary list: "${vocabQuery}" (${sanitized.length} terms)`, "success");
-          
-          // Safely select first word in new list
-          setActiveWordIndex(0);
-          window.dispatchEvent(new CustomEvent("react-word-changed", { detail: 0 }));
+
+          // Save custom dataset to local storage
+          try {
+            localStorage.setItem("ielts_driver_active_vocab_name", vocabQuery);
+            localStorage.setItem("ielts_driver_active_vocab_json", JSON.stringify(sanitized));
+          } catch (e) {}
+
+          // Reset unplayed shuffle bag for new dataset
+          unplayedBagRef.current = [];
+          const startIdx = getNextRandomWordIndex(sanitized);
+
+          setActiveWordIndex(startIdx);
+          try {
+            localStorage.setItem("ielts_driver_word_idx", startIdx.toString());
+          } catch (e) {}
+
+          triggerToast(`📚 Loaded dataset: "${vocabQuery}" (${sanitized.length} terms)`, "success");
+          window.dispatchEvent(new CustomEvent("react-word-changed", { detail: startIdx }));
         })
         .catch(err => {
           console.warn(`Could not load custom vocabulary list "${vocabQuery}":`, err);
           triggerToast(`⚠️ List "${vocabQuery}" not found. Loaded default vocabulary list.`, "info");
         });
+    } else {
+      // No URL query parameter: check if a custom dataset was saved in localstorage
+      try {
+        const savedVocabName = localStorage.getItem("ielts_driver_active_vocab_name");
+        const savedVocabJson = localStorage.getItem("ielts_driver_active_vocab_json");
+
+        if (savedVocabName && savedVocabJson) {
+          const parsed = JSON.parse(savedVocabJson);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setWordsList(parsed);
+            setIELTSWords(parsed);
+            setActiveListName(savedVocabName);
+
+            const savedWordIdxStr = localStorage.getItem("ielts_driver_word_idx");
+            let initialIdx = 0;
+            if (savedWordIdxStr !== null) {
+              initialIdx = parseInt(savedWordIdxStr, 10) % parsed.length;
+            } else {
+              initialIdx = getNextRandomWordIndex(parsed);
+            }
+            setActiveWordIndex(initialIdx);
+            window.dispatchEvent(new CustomEvent("react-word-changed", { detail: initialIdx }));
+          }
+        }
+      } catch (e) {
+        console.error("Failed to restore saved custom dataset:", e);
+      }
     }
   }, []);
 
@@ -2471,8 +2567,35 @@ export default function App() {
   const handlePracticeWord = (index: number) => {
     setActiveWordIndex(index);
     setSpelledText(""); // Reset current letters spelt
-    triggerToast(`📖 Practice word programmed: "${IELTS_WORDS[index].word}"`, "info");
+    
+    // Remove index from unplayed shuffle bag so it won't repeat before other words
+    unplayedBagRef.current = unplayedBagRef.current.filter(i => i !== index);
+    try {
+      localStorage.setItem("ielts_driver_unplayed_bag", JSON.stringify(unplayedBagRef.current));
+    } catch (e) {}
+
+    const targetWordName = wordsList[index]?.word || "";
+    triggerToast(`📖 Practice word programmed: "${targetWordName}"`, "info");
     setActiveTab("streets");
+  };
+
+  // Reset to default Academic Word List
+  const handleResetToDefaultList = () => {
+    try {
+      localStorage.removeItem("ielts_driver_active_vocab_name");
+      localStorage.removeItem("ielts_driver_active_vocab_json");
+    } catch (e) {}
+
+    setWordsList(DEFAULT_WORDS);
+    setIELTSWords(DEFAULT_WORDS);
+    setActiveListName("default");
+
+    unplayedBagRef.current = [];
+    const nextIdx = getNextRandomWordIndex(DEFAULT_WORDS);
+    setActiveWordIndex(nextIdx);
+
+    triggerToast("📚 Reset to default Academic Word List", "info");
+    window.dispatchEvent(new CustomEvent("react-word-changed", { detail: nextIdx }));
   };
 
   // Unscramble mechanics
@@ -2561,7 +2684,7 @@ export default function App() {
       playAudioSynth("success");
       const wordBonus = unscrambleWordInfo.word.length * 20;
       const finalBudget = cash + wordBonus;
-      const nextIdx = (activeWordIndex + 1) % IELTS_WORDS.length;
+      const nextIdx = getNextRandomWordIndex(wordsList, activeWordIndex);
       const nextSolvedCount = wordsSolvedCount + 1;
 
       setCash(finalBudget);
@@ -2591,7 +2714,7 @@ export default function App() {
     playAudioSynth("loss");
     const pityReward = 10;
     const finalBudget = cash + pityReward;
-    const nextIdx = (activeWordIndex + 1) % IELTS_WORDS.length;
+    const nextIdx = getNextRandomWordIndex(wordsList, activeWordIndex);
     const nextSolvedCount = wordsSolvedCount + 1;
 
     setCash(finalBudget);
@@ -3392,9 +3515,18 @@ export default function App() {
                       Academic Word List ({wordsList.length} terms)
                     </span>
                     {activeListName !== "default" && (
-                      <span className="text-[9px] font-cyber font-bold uppercase px-2 py-0.5 rounded bg-amber-950/60 border border-amber-500/40 text-amber-400">
-                        URL DATASET: {activeListName}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[9px] font-cyber font-bold uppercase px-2 py-0.5 rounded bg-amber-950/60 border border-amber-500/40 text-amber-400">
+                          URL DATASET: {activeListName}
+                        </span>
+                        <button
+                          onClick={handleResetToDefaultList}
+                          className="text-[9px] font-cyber font-bold uppercase px-2 py-0.5 rounded bg-slate-900 border border-slate-700 hover:border-slate-500 text-slate-300 hover:text-white cursor-pointer transition-all"
+                          title="Reset to default Academic Word List"
+                        >
+                          Reset Default
+                        </button>
+                      </div>
                     )}
                   </div>
                   
