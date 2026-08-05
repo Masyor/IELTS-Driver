@@ -17,7 +17,6 @@ import {
   Keyboard,
   X,
   Navigation,
-  Download,
   Maximize2,
   Minimize2
 } from "lucide-react";
@@ -219,11 +218,11 @@ export const CarPreviewSvg = ({ carId, color, className = "w-24 h-40" }: { carId
   return null;
 };
 
-// Responsive Virtual Joystick Component for Touch/Mobile play
-const TouchJoystickControls = ({ onHonk }: { onHonk: () => void }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [stickPos, setStickPos] = useState({ x: 0, y: 0 });
-  const [active, setActive] = useState(false);
+// Responsive Steering Wheel & Vertically Stacked Controls for Mobile / Touch play
+const TouchSteeringWheelControls = ({ onHonk }: { onHonk: () => void }) => {
+  const wheelRef = useRef<HTMLDivElement>(null);
+  const [steerVal, setSteerVal] = useState(0); // -1.0 to 1.0
+  const [isDraggingWheel, setIsDraggingWheel] = useState(false);
   const [gasPressed, setGasPressed] = useState(false);
   const [brakePressed, setBrakePressed] = useState(false);
 
@@ -238,151 +237,161 @@ const TouchJoystickControls = ({ onHonk }: { onHonk: () => void }) => {
     };
   };
 
-  const handlePointerDown = (e: React.PointerEvent) => {
+  const calculateSteer = (clientX: number) => {
+    if (!wheelRef.current) return 0;
+    const rect = wheelRef.current.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const maxRadius = rect.width / 2 - 10;
+    const dx = clientX - centerX;
+    const clampedSteer = Math.max(-1, Math.min(1, dx / maxRadius));
+    return clampedSteer;
+  };
+
+  const handleWheelPointerDown = (e: React.PointerEvent) => {
     e.preventDefault();
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    setActive(true);
-    updateStick(e.clientX, e.clientY);
+    setIsDraggingWheel(true);
+    const newSteer = calculateSteer(e.clientX);
+    setSteerVal(newSteer);
+    const throttle = gasPressed ? 1 : brakePressed ? -1 : 0;
+    updateTouchControls(newSteer, throttle);
   };
 
-  const handlePointerMove = (e: React.PointerEvent) => {
-    if (!active) return;
-    updateStick(e.clientX, e.clientY);
+  const handleWheelPointerMove = (e: React.PointerEvent) => {
+    if (!isDraggingWheel) return;
+    const newSteer = calculateSteer(e.clientX);
+    setSteerVal(newSteer);
+    const throttle = gasPressed ? 1 : brakePressed ? -1 : 0;
+    updateTouchControls(newSteer, throttle);
   };
 
-  const handlePointerUp = (e: React.PointerEvent) => {
-    setActive(false);
-    setStickPos({ x: 0, y: 0 });
-    updateTouchControls(0, gasPressed ? 1 : brakePressed ? -1 : 0);
-  };
-
-  const updateStick = (clientX: number, clientY: number) => {
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-    const maxR = rect.width / 2 - 12;
-
-    let dx = clientX - centerX;
-    let dy = clientY - centerY;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-
-    if (dist > maxR) {
-      dx = (dx / dist) * maxR;
-      dy = (dy / dist) * maxR;
-    }
-
-    setStickPos({ x: dx, y: dy });
-
-    const steer = dx / maxR;
-    let throttle = -dy / maxR;
-    if (gasPressed) throttle = 1;
-    if (brakePressed) throttle = -1;
-
-    updateTouchControls(steer, throttle);
+  const handleWheelPointerUp = (e: React.PointerEvent) => {
+    setIsDraggingWheel(false);
+    setSteerVal(0);
+    const throttle = gasPressed ? 1 : brakePressed ? -1 : 0;
+    updateTouchControls(0, throttle);
   };
 
   const handleGasDown = (e: React.SyntheticEvent) => {
     e.preventDefault();
     setGasPressed(true);
-    const currSteer = (window as any).__touchControls?.steer || 0;
-    updateTouchControls(currSteer, 1);
+    updateTouchControls(steerVal, 1);
   };
 
   const handleGasUp = (e: React.SyntheticEvent) => {
     e.preventDefault();
     setGasPressed(false);
-    const currSteer = (window as any).__touchControls?.steer || 0;
-    const currStickThrottle = stickPos.y !== 0 ? -stickPos.y / 40 : 0;
-    updateTouchControls(currSteer, brakePressed ? -1 : currStickThrottle);
+    updateTouchControls(steerVal, brakePressed ? -1 : 0);
   };
 
   const handleBrakeDown = (e: React.SyntheticEvent) => {
     e.preventDefault();
     setBrakePressed(true);
-    const currSteer = (window as any).__touchControls?.steer || 0;
-    updateTouchControls(currSteer, -1);
+    updateTouchControls(steerVal, -1);
   };
 
   const handleBrakeUp = (e: React.SyntheticEvent) => {
     e.preventDefault();
     setBrakePressed(false);
-    const currSteer = (window as any).__touchControls?.steer || 0;
-    const currStickThrottle = stickPos.y !== 0 ? -stickPos.y / 40 : 0;
-    updateTouchControls(currSteer, gasPressed ? 1 : currStickThrottle);
+    updateTouchControls(steerVal, gasPressed ? 1 : 0);
   };
 
   return (
-    <div className="absolute inset-x-0 bottom-12 sm:bottom-6 pb-[max(1rem,env(safe-area-inset-bottom))] z-30 pointer-events-none px-3 sm:px-6 flex justify-between items-end touch-none select-none">
+    <div className="absolute inset-x-0 bottom-2 sm:bottom-6 pb-[max(0.5rem,env(safe-area-inset-bottom))] z-30 pointer-events-none px-2 sm:px-6 flex justify-between items-end touch-none select-none">
       
-      {/* JOYSTICK ON BOTTOM LEFT */}
+      {/* STEERING WHEEL CONTROL ON BOTTOM LEFT */}
       <div className="pointer-events-auto flex flex-col items-center gap-1">
-        <span className="text-[9px] font-cyber font-bold text-amber-400 uppercase tracking-widest bg-slate-950/80 px-2 py-0.5 rounded border border-amber-500/30">
-          ANALOG JOYSTICK
+        <span className="text-[9px] font-cyber font-bold text-amber-400 uppercase tracking-widest bg-slate-950/90 px-2 py-0.5 rounded border border-amber-500/30 shadow-md">
+          STEERING WHEEL
         </span>
-        <div
-          ref={containerRef}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerUp}
-          className="w-32 h-32 sm:w-36 sm:h-36 rounded-full bg-slate-950/85 border-2 border-amber-500/60 backdrop-blur-md flex items-center justify-center relative shadow-[0_0_25px_rgba(245,158,11,0.25)]"
-        >
-          <div className="absolute inset-2 rounded-full border border-dashed border-amber-500/30" />
-          <div className="absolute top-1.5 text-[10px] font-cyber text-amber-500/80 font-black">▲</div>
-          <div className="absolute bottom-1.5 text-[10px] font-cyber text-amber-500/80 font-black">▼</div>
-          <div className="absolute left-1.5 text-[10px] font-cyber text-amber-500/80 font-black">◄</div>
-          <div className="absolute right-1.5 text-[10px] font-cyber text-amber-500/80 font-black">►</div>
 
+        <div
+          ref={wheelRef}
+          onPointerDown={handleWheelPointerDown}
+          onPointerMove={handleWheelPointerMove}
+          onPointerUp={handleWheelPointerUp}
+          onPointerCancel={handleWheelPointerUp}
+          className="w-32 h-32 sm:w-40 sm:h-36 rounded-2xl bg-slate-950/90 border-2 border-amber-500/60 backdrop-blur-md flex flex-col items-center justify-center relative shadow-[0_0_25px_rgba(245,158,11,0.25)] touch-none p-2"
+        >
+          {/* Top Directional Labels */}
+          <div className="w-full flex justify-between px-1 text-[8px] font-cyber font-black text-amber-400/80 mb-1">
+            <span>◄ LEFT</span>
+            <span>RIGHT ►</span>
+          </div>
+
+          {/* Rotating Steering Wheel Graphic */}
           <div
-            className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-yellow-400 via-amber-500 to-amber-600 border-2 border-white shadow-[0_0_15px_rgba(251,191,36,0.6)] flex items-center justify-center transition-transform duration-75 ${
-              active ? "scale-105" : ""
-            }`}
+            className="w-18 h-18 sm:w-22 sm:h-22 rounded-full border-4 border-amber-400 bg-gradient-to-br from-slate-900 via-slate-950 to-black shadow-[0_0_20px_rgba(245,158,11,0.3)] relative flex items-center justify-center transition-transform duration-75"
             style={{
-              transform: `translate(${stickPos.x}px, ${stickPos.y}px)`,
+              transform: `rotate(${steerVal * 75}deg)`
             }}
           >
-            <div className="w-5 h-5 rounded-full bg-slate-950/50 border border-amber-200" />
+            {/* Top Center Marker */}
+            <div className="absolute top-0 w-1.5 h-3 bg-amber-400 rounded-full shadow-[0_0_8px_#f59e0b]" />
+
+            {/* Spokes */}
+            <div className="absolute w-full h-1 bg-amber-500/50" />
+            <div className="absolute h-1/2 w-1 bg-amber-500/50 bottom-0" />
+
+            {/* Hub */}
+            <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-full bg-gradient-to-br from-amber-500 to-amber-700 border-2 border-amber-200 flex items-center justify-center shadow-inner">
+              <span className="text-[7px] font-cyber font-black text-slate-950 tracking-tighter">IELTS</span>
+            </div>
+          </div>
+
+          {/* Horizontal Slider Indicator Track */}
+          <div className="w-full mt-2 h-1.5 bg-slate-900 rounded-full border border-amber-500/40 relative overflow-hidden">
+            <div
+              className="absolute top-0 bottom-0 bg-amber-400 transition-all duration-75"
+              style={{
+                left: steerVal < 0 ? `${50 + steerVal * 50}%` : '50%',
+                width: `${Math.abs(steerVal) * 50}%`
+              }}
+            />
+            <div className="absolute left-1/2 -translate-x-1/2 top-0 bottom-0 w-0.5 bg-amber-200" />
           </div>
         </div>
       </div>
 
-      {/* ACTION BUTTONS ON BOTTOM RIGHT */}
-      <div className="pointer-events-auto flex items-end gap-2.5">
+      {/* ACTION BUTTONS STACKED VERTICALLY ON BOTTOM RIGHT */}
+      <div className="pointer-events-auto flex flex-col items-center gap-1.5">
         
-        <button
-          onClick={onHonk}
-          className="w-12 h-12 rounded-full bg-amber-950/80 border-2 border-amber-400 text-amber-300 font-cyber font-black text-[10px] uppercase shadow-lg flex items-center justify-center active:scale-90 transition-transform cursor-pointer"
-        >
-          HONK
-        </button>
-
-        <button
-          onPointerDown={handleBrakeDown}
-          onPointerUp={handleBrakeUp}
-          onPointerCancel={handleBrakeUp}
-          className={`w-16 h-16 sm:w-18 sm:h-18 rounded-2xl border-2 font-cyber font-black text-xs uppercase flex flex-col items-center justify-center shadow-xl transition-all active:scale-95 ${
-            brakePressed 
-              ? "bg-rose-600 border-white text-white shadow-rose-500/50 scale-95" 
-              : "bg-rose-950/80 border-rose-500 text-rose-300"
-          }`}
-        >
-          <span>BRAKE</span>
-          <span className="text-[8px] opacity-75">REV</span>
-        </button>
-
+        {/* 1. GAS BUTTON */}
         <button
           onPointerDown={handleGasDown}
           onPointerUp={handleGasUp}
           onPointerCancel={handleGasUp}
-          className={`w-20 h-20 sm:w-22 sm:h-22 rounded-2xl border-2 font-cyber font-black text-sm uppercase flex flex-col items-center justify-center shadow-2xl transition-all active:scale-95 ${
+          className={`w-16 h-14 sm:w-20 sm:h-16 rounded-xl border-2 font-cyber font-black text-xs uppercase flex flex-col items-center justify-center shadow-xl transition-all active:scale-95 cursor-pointer ${
             gasPressed 
               ? "bg-emerald-500 border-white text-slate-950 shadow-emerald-400/50 scale-95" 
               : "bg-emerald-950/80 border-emerald-400 text-emerald-300"
           }`}
         >
-          <Zap className="w-5 h-5 mb-0.5" />
-          <span>GAS</span>
+          <Zap className="w-4 h-4 mb-0.5" />
+          <span className="text-[10px] sm:text-xs leading-none">GAS</span>
+        </button>
+
+        {/* 2. BRAKE BUTTON */}
+        <button
+          onPointerDown={handleBrakeDown}
+          onPointerUp={handleBrakeUp}
+          onPointerCancel={handleBrakeUp}
+          className={`w-16 h-12 sm:w-20 sm:h-14 rounded-xl border-2 font-cyber font-black text-xs uppercase flex flex-col items-center justify-center shadow-xl transition-all active:scale-95 cursor-pointer ${
+            brakePressed 
+              ? "bg-rose-600 border-white text-white shadow-rose-500/50 scale-95" 
+              : "bg-rose-950/80 border-rose-500 text-rose-300"
+          }`}
+        >
+          <span className="text-[10px] sm:text-xs leading-none">BRAKE</span>
+          <span className="text-[7px] opacity-80">REV</span>
+        </button>
+
+        {/* 3. HONK BUTTON */}
+        <button
+          onClick={onHonk}
+          className="w-16 h-10 sm:w-20 sm:h-11 rounded-xl bg-amber-950/90 border-2 border-amber-400 text-amber-300 font-cyber font-black text-[10px] uppercase shadow-lg flex items-center justify-center active:scale-90 transition-transform cursor-pointer"
+        >
+          HONK
         </button>
 
       </div>
@@ -555,21 +564,6 @@ export default function App() {
       window.removeEventListener("keydown", triggerAutoFullscreen);
     };
   }, []);
-
-  // Export vocabulary list as separate JSON file download
-  const handleExportVocabJSON = () => {
-    const jsonString = JSON.stringify(IELTS_WORDS, null, 2);
-    const blob = new Blob([jsonString], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "ielts_vocab_list.json";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    triggerToast("📥 Exported vocabulary list to ielts_vocab_list.json!", "success");
-  };
 
   // Unscramble Timer tracker
   useEffect(() => {
@@ -2524,18 +2518,18 @@ export default function App() {
     <div className="w-screen h-screen flex flex-col md:flex-row bg-[#0c0d0f] font-sans overflow-hidden">
       
       {/* MOBILE COMPACT TOP HEADER (< md) */}
-      <header className="flex md:hidden items-center justify-between px-3 py-2 bg-[#111215] border-b border-slate-800 z-30 shrink-0 font-cyber">
-        <div className="flex items-center gap-2">
-          <h1 className="text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-500">
+      <header className="flex md:hidden items-center justify-between px-2 py-1.5 bg-[#111215] border-b border-slate-800 z-30 shrink-0 font-cyber w-full overflow-hidden">
+        <div className="flex items-center gap-1.5 shrink-0">
+          <h1 className="text-xs font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-500 tracking-tight">
             IELTS <span className="text-white">DRIVER</span>
           </h1>
-          <span className="text-[10px] font-bold text-amber-400 bg-amber-950/50 border border-amber-500/30 px-1.5 py-0.5 rounded">
+          <span className="text-[9px] font-bold text-amber-400 bg-amber-950/50 border border-amber-500/30 px-1 py-0.5 rounded">
             ${cash}
           </span>
         </div>
 
         {/* Mobile Navigation & Utility Buttons */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 shrink-0">
           <button
             onClick={toggleFullscreen}
             className="p-1 rounded-lg text-[10px] font-bold bg-slate-900 text-amber-400 border border-slate-800 hover:border-amber-500/50 transition-all cursor-pointer"
@@ -2545,40 +2539,32 @@ export default function App() {
           </button>
 
           <button
-            onClick={handleExportVocabJSON}
-            className="p-1 rounded-lg text-[10px] font-bold bg-slate-900 text-amber-400 border border-slate-800 hover:border-amber-500/50 transition-all cursor-pointer"
-            title="Export Vocab JSON"
-          >
-            <Download className="w-3.5 h-3.5" />
-          </button>
-
-          <button
             onClick={() => setActiveTab("streets")}
-            className={`px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
+            className={`px-1.5 py-1 rounded-lg text-[9px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
               activeTab === "streets" 
                 ? "bg-amber-500 text-slate-950 shadow-[0_0_10px_rgba(245,158,11,0.3)]" 
                 : "bg-slate-900 text-slate-400 border border-slate-800"
             }`}
           >
             <Compass className="w-3 h-3" />
-            <span>STREETS</span>
+            <span className="hidden sm:inline">STREETS</span>
           </button>
 
           <button
             onClick={() => setActiveTab("garage")}
-            className={`px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
+            className={`px-1.5 py-1 rounded-lg text-[9px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
               activeTab === "garage" 
                 ? "bg-amber-500 text-slate-950 shadow-[0_0_10px_rgba(245,158,11,0.3)]" 
                 : "bg-slate-900 text-slate-400 border border-slate-800"
             }`}
           >
             <Car className="w-3 h-3" />
-            <span>GARAGE</span>
+            <span className="hidden sm:inline">GARAGE</span>
           </button>
 
           <button
             onClick={() => setActiveTab("dictionary")}
-            className={`px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
+            className={`px-1.5 py-1 rounded-lg text-[9px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
               activeTab === "dictionary" 
                 ? "bg-amber-500 text-slate-950 shadow-[0_0_10px_rgba(245,158,11,0.3)]" 
                 : "bg-slate-900 text-slate-400 border border-slate-800"
@@ -2719,7 +2705,7 @@ export default function App() {
             >
               <span className="flex items-center gap-2">
                 <Gamepad2 className="w-4 h-4 text-amber-400" />
-                <span>MOBILE JOYSTICK</span>
+                <span>STEERING WHEEL</span>
               </span>
               <span className={`text-[9px] px-1.5 py-0.5 rounded font-black ${showTouchControls ? "bg-amber-500 text-slate-950" : "bg-slate-800 text-slate-500"}`}>
                 {showTouchControls ? "ON" : "OFF"}
@@ -2727,28 +2713,19 @@ export default function App() {
             </button>
 
             {/* Action & Utility Buttons */}
-            <div className="grid grid-cols-2 gap-2 mt-0.5">
+            <div className="grid grid-cols-3 gap-1.5 mt-0.5">
               <button
                 onClick={toggleFullscreen}
-                className="py-1.5 px-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-amber-500/50 text-slate-300 hover:text-amber-300 text-[10px] font-cyber font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                className="py-1.5 px-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-amber-500/50 text-slate-300 hover:text-amber-300 text-[9px] font-cyber font-bold flex flex-col items-center justify-center gap-1 transition-all cursor-pointer"
                 title="Toggle Fullscreen mode"
               >
                 {isFullscreen ? <Minimize2 className="w-3.5 h-3.5 text-amber-400" /> : <Maximize2 className="w-3.5 h-3.5 text-amber-400" />}
-                <span>{isFullscreen ? "EXIT FULLSCREEN" : "FULLSCREEN"}</span>
-              </button>
-
-              <button
-                onClick={handleExportVocabJSON}
-                className="py-1.5 px-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-amber-500/50 text-slate-300 hover:text-amber-300 text-[10px] font-cyber font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                title="Export vocabulary JSON file"
-              >
-                <Download className="w-3.5 h-3.5 text-amber-400" />
-                <span>EXPORT JSON</span>
+                <span>{isFullscreen ? "EXIT" : "FULLSCREEN"}</span>
               </button>
 
               <button
                 onClick={handleTeleportToStart}
-                className="py-1.5 px-2 rounded-lg bg-rose-950/20 hover:bg-rose-900/40 border border-amber-500/40 hover:border-rose-500/80 text-amber-300 hover:text-rose-300 text-[10px] font-cyber font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                className="py-1.5 px-1 rounded-lg bg-rose-950/20 hover:bg-rose-900/40 border border-amber-500/40 hover:border-rose-500/80 text-amber-300 hover:text-rose-300 text-[9px] font-cyber font-bold flex flex-col items-center justify-center gap-1 transition-all cursor-pointer"
                 title="Teleport car back to start location"
               >
                 <LifeBuoy className="w-3.5 h-3.5 text-amber-400" />
@@ -2757,11 +2734,11 @@ export default function App() {
 
               <button
                 onClick={() => setShowWelcomeModal(true)}
-                className="py-1.5 px-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-amber-500/50 text-slate-300 hover:text-amber-300 text-[10px] font-cyber font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                className="py-1.5 px-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-amber-500/50 text-slate-300 hover:text-amber-300 text-[9px] font-cyber font-bold flex flex-col items-center justify-center gap-1 transition-all cursor-pointer"
                 title="View game loop and controls guide"
               >
                 <HelpCircle className="w-3.5 h-3.5 text-amber-400" />
-                <span>GAME GUIDE</span>
+                <span>GUIDE</span>
               </button>
             </div>
           </div>
@@ -2822,7 +2799,7 @@ export default function App() {
                   className="text-[9px] font-cyber font-bold px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-amber-400 flex items-center gap-1 cursor-pointer"
                 >
                   <Gamepad2 className="w-3 h-3" />
-                  <span>{showTouchControls ? "JOYSTICK ON" : "JOYSTICK OFF"}</span>
+                  <span>{showTouchControls ? "WHEEL ON" : "WHEEL OFF"}</span>
                 </button>
                 <span className="text-[9px] font-cyber font-bold text-cyan-400 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800">{carSpeed} MPH</span>
               </div>
@@ -2907,9 +2884,9 @@ export default function App() {
           id="game-canvas-container"
         />
 
-        {/* RESPONSIVE MOBILE TOUCH JOYSTICK & ACTION BUTTONS */}
+        {/* RESPONSIVE MOBILE TOUCH STEERING WHEEL & ACTION BUTTONS */}
         {activeTab === "streets" && showTouchControls && (
-          <TouchJoystickControls onHonk={() => playAudioSynth("honk")} />
+          <TouchSteeringWheelControls onHonk={() => playAudioSynth("honk")} />
         )}
 
         {/* INTERACTIVE UNSCRAMBLE MINI-GAME OVERLAY */}
@@ -3270,14 +3247,6 @@ export default function App() {
                 </div>
                 <div className="flex items-center gap-2">
                   <button 
-                    onClick={handleExportVocabJSON} 
-                    className="px-3 py-1 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 rounded-lg text-xs font-cyber cursor-pointer text-amber-300 hover:text-white flex items-center gap-1.5 transition-all"
-                    title="Export full vocabulary list as JSON file"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>Export JSON</span>
-                  </button>
-                  <button 
                     onClick={() => setActiveTab("streets")} 
                     className="px-3 py-1 bg-slate-800 border border-slate-700 hover:bg-slate-700 hover:border-slate-600 rounded-lg text-xs font-cyber cursor-pointer text-slate-300 hover:text-white"
                   >
@@ -3347,23 +3316,18 @@ export default function App() {
 
         {/* WELCOME GAME LOOP & CONTROLS POP-UP MODAL */}
         {showWelcomeModal && (
-          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-            <div className="bg-[#0b101d] border-2 border-amber-500/80 rounded-2xl max-w-xl w-full shadow-[0_0_40px_rgba(245,158,11,0.3)] overflow-hidden my-auto flex flex-col font-sans">
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-hidden">
+            <div className="bg-[#0b101d] border-2 border-amber-500/80 rounded-2xl max-w-lg w-full shadow-[0_0_40px_rgba(245,158,11,0.3)] overflow-hidden flex flex-col font-sans my-auto max-h-[92vh]">
               
               {/* Header */}
-              <div className="p-5 border-b border-slate-800 bg-gradient-to-r from-[#111827] to-[#1a233a] flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/50 flex items-center justify-center shrink-0">
-                    <Car className="w-6 h-6 text-amber-400" />
+              <div className="p-3 sm:p-4 border-b border-slate-800 bg-gradient-to-r from-[#111827] to-[#1a233a] flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-500/20 border border-amber-500/50 flex items-center justify-center shrink-0">
+                    <Car className="w-5 h-5 text-amber-400" />
                   </div>
-                  <div>
-                    <span className="text-[10px] font-cyber font-black tracking-widest uppercase text-amber-400 block">
-                      RETRO CYBERPUNK VOCAB RUN
-                    </span>
-                    <h2 className="text-lg sm:text-xl font-cyber font-black text-white tracking-wider">
-                      WELCOME TO IELTS DRIVER
-                    </h2>
-                  </div>
+                  <h2 className="text-base sm:text-lg font-cyber font-black text-white tracking-wider">
+                    WELCOME TO IELTS DRIVER
+                  </h2>
                 </div>
 
                 <button
@@ -3374,67 +3338,67 @@ export default function App() {
                   className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer"
                   title="Close Guide"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
 
-              {/* Content */}
-              <div className="p-5 sm:p-6 flex flex-col gap-4 text-slate-200 text-xs sm:text-sm max-h-[75vh] overflow-y-auto">
+              {/* Content - Compact Layout without scrolling */}
+              <div className="p-3 sm:p-4 flex flex-col gap-2.5 text-slate-200 text-xs">
                 
                 {/* Game Loop Explanation */}
-                <div className="bg-[#070b14] p-4 rounded-xl border border-amber-500/30 flex flex-col gap-2.5">
-                  <div className="flex items-center gap-2 text-amber-400 font-cyber font-bold text-xs uppercase tracking-wider">
-                    <Trophy className="w-4 h-4 text-amber-400" />
+                <div className="bg-[#070b14] p-3 rounded-xl border border-amber-500/30 flex flex-col gap-1.5">
+                  <div className="flex items-center gap-1.5 text-amber-400 font-cyber font-bold text-xs uppercase tracking-wider">
+                    <Trophy className="w-3.5 h-3.5 text-amber-400" />
                     <span>HOW TO PLAY (GAME LOOP)</span>
                   </div>
 
-                  <ol className="list-decimal list-inside space-y-1.5 text-slate-300 font-sans leading-relaxed text-xs">
-                    <li><strong className="text-white">Drive the Streets</strong>: Cruise through the top-down retro city grid in your car.</li>
-                    <li><strong className="text-amber-300">Collect Letter Pickups</strong>: Run over the glowing orange letter markers on the roads to collect spelling letters for your active IELTS term.</li>
-                    <li><strong className="text-emerald-400">Unscramble & Earn Cash</strong>: Once all letters are collected, solve the spelling mini-game to earn cash rewards & unlock dictionary badges!</li>
-                    <li><strong className="text-cyan-300">Garage Upgrades</strong>: Spend cash to unlock high-performance supercars, limos, and custom paint finishes.</li>
+                  <ol className="list-decimal list-inside space-y-1 text-slate-300 font-sans leading-snug text-[11px]">
+                    <li><strong className="text-white">Drive Streets</strong>: Cruise top-down retro roads in your car.</li>
+                    <li><strong className="text-amber-300">Collect Letters</strong>: Run over orange letter markers to collect word letters.</li>
+                    <li><strong className="text-emerald-400">Unscramble</strong>: Solve the word puzzle to earn cash rewards & badges!</li>
+                    <li><strong className="text-cyan-300">Garage Upgrades</strong>: Spend cash to unlock supercars and custom colors.</li>
                   </ol>
                 </div>
 
                 {/* Controls Breakdown */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   
-                  {/* Joystick Controls */}
-                  <div className="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800 flex flex-col gap-2">
-                    <div className="flex items-center gap-2 text-amber-400 font-cyber font-bold text-xs">
-                      <Gamepad2 className="w-4 h-4 text-amber-400" />
-                      <span>ON-SCREEN JOYSTICK</span>
+                  {/* Steering Wheel Controls */}
+                  <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 flex flex-col gap-1">
+                    <div className="flex items-center gap-1.5 text-amber-400 font-cyber font-bold text-xs">
+                      <Gamepad2 className="w-3.5 h-3.5 text-amber-400" />
+                      <span>STEERING WHEEL & PEDALS</span>
                     </div>
-                    <p className="text-[11px] text-slate-300 leading-normal">
-                      Drag the <strong>virtual joystick</strong> on the bottom-left to steer in 360°. Tap <strong>GAS</strong> or <strong>BRAKE</strong> on the bottom-right to accelerate or reverse.
+                    <p className="text-[10px] sm:text-[11px] text-slate-300 leading-tight">
+                      Slide or drag the <strong>steering wheel</strong> on the left to turn. Tap <strong>GAS</strong>, <strong>BRAKE</strong>, or <strong>HONK</strong> stacked on the right.
                     </p>
                   </div>
 
                   {/* Keyboard Controls */}
-                  <div className="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800 flex flex-col gap-2">
-                    <div className="flex items-center gap-2 text-cyan-400 font-cyber font-bold text-xs">
-                      <Keyboard className="w-4 h-4 text-cyan-400" />
+                  <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 flex flex-col gap-1">
+                    <div className="flex items-center gap-1.5 text-cyan-400 font-cyber font-bold text-xs">
+                      <Keyboard className="w-3.5 h-3.5 text-cyan-400" />
                       <span>KEYBOARD CONTROLS</span>
                     </div>
-                    <p className="text-[11px] text-slate-300 leading-normal">
-                      Use <strong>WASD</strong> or <strong>Arrow Keys</strong> to steer, accelerate, and reverse. Press <strong>Spacebar</strong> or tap <strong>HONK</strong> for horn.
+                    <p className="text-[10px] sm:text-[11px] text-slate-300 leading-tight">
+                      Use <strong>WASD</strong> or <strong>Arrow Keys</strong> to steer, accelerate, and reverse. Press <strong>Spacebar</strong> or tap <strong>HONK</strong>.
                     </p>
                   </div>
 
                 </div>
 
                 {/* Teleport / Stuck Tip */}
-                <div className="bg-amber-950/20 p-3 rounded-xl border border-amber-500/30 flex items-center gap-3">
-                  <LifeBuoy className="w-5 h-5 text-amber-400 shrink-0" />
-                  <p className="text-[11px] text-amber-200/90 leading-tight">
-                    <strong>Trapped or stuck?</strong> Click the <strong>"Help I'm Stuck"</strong> button at any time to instantly teleport your car back to the starting road intersection!
+                <div className="bg-amber-950/20 p-2 sm:p-2.5 rounded-xl border border-amber-500/30 flex items-center gap-2">
+                  <LifeBuoy className="w-4 h-4 text-amber-400 shrink-0" />
+                  <p className="text-[10px] sm:text-[11px] text-amber-200/90 leading-tight">
+                    <strong>Trapped or stuck?</strong> Tap <strong>"HELP STUCK"</strong> anytime to teleport back to the start!
                   </p>
                 </div>
 
               </div>
 
               {/* Footer */}
-              <div className="p-4 border-t border-slate-800/80 bg-[#070b14] flex justify-end">
+              <div className="p-3 border-t border-slate-800/80 bg-[#070b14] flex justify-end shrink-0">
                 <button
                   onClick={() => {
                     playAudioSynth("pickup");
@@ -3443,9 +3407,9 @@ export default function App() {
                     }
                     setShowWelcomeModal(false);
                   }}
-                  className="w-full sm:w-auto px-6 py-3 rounded-xl bg-gradient-to-r from-yellow-400 via-amber-500 to-amber-600 hover:from-yellow-300 hover:to-amber-500 text-slate-950 font-cyber font-black text-xs tracking-wider uppercase shadow-[0_0_20px_rgba(245,158,11,0.4)] hover:shadow-[0_0_30px_rgba(245,158,11,0.6)] transition-all transform active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-yellow-400 via-amber-500 to-amber-600 hover:from-yellow-300 hover:to-amber-500 text-slate-950 font-cyber font-black text-xs tracking-wider uppercase shadow-[0_0_20px_rgba(245,158,11,0.4)] transition-all transform active:scale-95 cursor-pointer flex items-center justify-center gap-2"
                 >
-                  <Play className="w-4 h-4 fill-slate-950" />
+                  <Play className="w-3.5 h-3.5 fill-slate-950" />
                   <span>START DRIVING NOW</span>
                 </button>
               </div>
