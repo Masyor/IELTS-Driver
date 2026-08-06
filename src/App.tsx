@@ -1130,6 +1130,12 @@ export default function App() {
             bWall.setStrokeStyle(4, 0x1f2022, 1.0); // Deep dark borders
             this.buildings.add(bWall);
             
+            // Inset building physics body slightly (252x252 with 14px offset) to create a curb/sidewalk grace area
+            if (bWall.body) {
+              (bWall.body as any).setSize(252, 252);
+              (bWall.body as any).setOffset(14, 14);
+            }
+            
             // Draw walkway boundaries
             this.buildingBorders.strokeRect(x - 140, y - 140, 280, 280);
 
@@ -1187,7 +1193,7 @@ export default function App() {
         this.player.setCollideWorldBounds(true);
         this.player.setOrigin(0.5, 0.5);
         this.player.setDepth(20);
-        this.player.setCircle(18, 2, 22);
+        this.player.setCircle(14, 4, 21);
 
         // Sync initial car configuration stats from React state
         this.syncCarStats(activeCarId);
@@ -1588,21 +1594,21 @@ export default function App() {
           // Precision top-down circular collision body setup matching texture dimensions
           if (spec.id === "rusty_banger") {
             // Canvas: 36x70
-            this.player.setCircle(17, 1, 18);
+            this.player.setCircle(13, 5, 22);
           } else if (spec.id === "fleet_sedan") {
             // Canvas: 40x78
-            this.player.setCircle(18, 2, 21);
+            this.player.setCircle(14, 6, 25);
           } else if (spec.id === "turbo_interceptor") {
             // Canvas: 42x82
-            this.player.setCircle(19, 2, 22);
+            this.player.setCircle(14, 7, 27);
           } else if (spec.id === "cyber_hypercar") {
             // Canvas: 42x84
-            this.player.setCircle(19, 2, 23);
+            this.player.setCircle(14, 7, 28);
           } else if (spec.id === "executive_limo") {
             // Canvas: 42x130
-            this.player.setCircle(20, 1, 45);
+            this.player.setCircle(15, 6, 50);
           } else {
-            this.player.setCircle(18, 2, 22);
+            this.player.setCircle(14, 5, 24);
           }
         }
 
@@ -1713,7 +1719,7 @@ export default function App() {
           const npcObj = this.physics.add.sprite(drive.x, drive.y, "npc_chassis");
           npcObj.setCollideWorldBounds(false);
           npcObj.body.setImmovable(true);
-          npcObj.setCircle(17, 3, 20);
+          npcObj.setCircle(14, 6, 23.5);
           npcObj.setTint(Phaser.Math.RND.pick(NPC_COLORS));
 
           if (drive.vertical) {
@@ -1776,7 +1782,7 @@ export default function App() {
           const npcObj = this.physics.add.sprite(startPt.x, startPt.y, "npc_chassis");
           npcObj.setCollideWorldBounds(true);
           npcObj.body.setImmovable(true);
-          npcObj.setCircle(17, 3, 20);
+          npcObj.setCircle(14, 6, 23.5);
           npcObj.setTint(Phaser.Math.RND.pick(NPC_COLORS));
 
           (npcObj as any).isWaypointRoute = true;
@@ -3125,31 +3131,31 @@ export default function App() {
 
         {/* INTERACTIVE UNSCRAMBLE MINI-GAME OVERLAY */}
         {isUnscrambling && unscrambleWordInfo && (
-          <div className="absolute inset-0 z-40 bg-black/90 backdrop-blur-md flex items-center justify-center p-6">
-            <div className={`bg-[#0c1221] border-2 ${isWrongSpelling ? 'border-red-500 animate-pulse' : 'border-amber-500'} rounded-2xl max-w-2xl w-full flex flex-col shadow-[0_0_30px_rgba(245,158,11,0.25)] overflow-hidden`}>
+          <div className="absolute inset-0 z-40 bg-black/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-6 overflow-hidden">
+            <div className={`bg-[#0c1221] border-2 ${isWrongSpelling ? 'border-red-500 animate-pulse' : 'border-amber-500'} rounded-2xl max-w-2xl w-full max-h-[92vh] flex flex-col shadow-[0_0_30px_rgba(245,158,11,0.25)] overflow-hidden`}>
               
-              <div className="p-5 border-b border-slate-800 bg-[#0e1628] flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-3 h-3 rounded-full bg-amber-500 animate-ping"></div>
-                  <h2 className="text-lg font-cyber font-black text-amber-500 tracking-wider uppercase">Unscramble the IELTS Term</h2>
+              <div className="p-3 sm:p-5 border-b border-slate-800 bg-[#0e1628] flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-amber-500 animate-ping"></div>
+                  <h2 className="text-sm sm:text-lg font-cyber font-black text-amber-500 tracking-wider uppercase">Unscramble IELTS Term</h2>
                 </div>
-                <div className="px-3 py-1 bg-slate-900 border border-slate-800 rounded text-[11px] font-cyber font-bold text-slate-400">
+                <div className="px-2.5 py-0.5 sm:px-3 sm:py-1 bg-slate-900 border border-slate-800 rounded text-[10px] sm:text-[11px] font-cyber font-bold text-slate-400 shrink-0">
                   TIMER: {unscrambleTime}s
                 </div>
               </div>
 
-              <div className="p-6 flex flex-col gap-6">
+              <div className="p-3 sm:p-6 flex flex-col gap-3 sm:gap-5 overflow-y-auto">
                 
                 {/* Definition Prompt */}
-                <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-800">
+                <div className="bg-slate-900/50 p-2.5 sm:p-4 rounded-xl border border-slate-800 shrink-0">
                   <span className="text-[9px] uppercase tracking-widest text-slate-500 font-bold block mb-1">Academic Definition</span>
-                  <p className="text-slate-200 text-sm leading-relaxed">{unscrambleWordInfo.definition}</p>
+                  <p className="text-slate-200 text-xs sm:text-sm leading-relaxed">{unscrambleWordInfo.definition}</p>
                 </div>
 
                 {/* Answer Slots */}
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-1.5 sm:gap-2">
                   <span className="text-[9px] uppercase tracking-widest text-slate-500 font-bold">Your Arrangement</span>
-                  <div className="flex gap-2 justify-center flex-wrap py-2 min-h-[50px] bg-slate-950/40 rounded-xl border border-slate-900 p-2.5">
+                  <div className="flex gap-1.5 sm:gap-2 justify-center flex-wrap py-1.5 sm:py-2 min-h-[44px] sm:min-h-[50px] bg-slate-950/40 rounded-xl border border-slate-900 p-2">
                     {Array.from({ length: unscrambleWordInfo.word.length }).map((_, slotIdx) => {
                       const filledLetter = unscrambleSlots[slotIdx];
                       return (
@@ -3157,7 +3163,7 @@ export default function App() {
                           key={slotIdx}
                           disabled={gaveUp}
                           onClick={() => filledLetter && handleLetterFromSlotToPool(filledLetter)}
-                          className={`w-12 h-12 rounded-xl font-cyber font-black text-xl border-2 flex items-center justify-center transition-all ${
+                          className={`w-9 h-9 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl font-cyber font-black text-base sm:text-xl border-2 flex items-center justify-center transition-all ${
                             filledLetter 
                               ? "border-emerald-500 bg-emerald-950/40 text-emerald-400 hover:bg-emerald-950/60 hover:scale-105 cursor-pointer shadow-[0_0_12px_rgba(16,185,129,0.15)]" 
                               : "border-slate-800 bg-slate-900/25 text-slate-600 border-dashed"
@@ -3172,9 +3178,9 @@ export default function App() {
 
                 {/* Letter Pool */}
                 {!gaveUp && (
-                  <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-1.5 sm:gap-2">
                     <span className="text-[9px] uppercase tracking-widest text-slate-500 font-bold">Collected Letters Pool (Click to place)</span>
-                    <div className="flex gap-2 justify-center flex-wrap py-2 min-h-[50px]">
+                    <div className="flex gap-1.5 sm:gap-2 justify-center flex-wrap py-1.5 sm:py-2 min-h-[44px] sm:min-h-[50px]">
                       {unscrambleWordInfo.collected.map((letter) => {
                         const isPlaced = unscrambleSlots.some(s => s.index === letter.index);
                         return (
@@ -3182,7 +3188,7 @@ export default function App() {
                             key={letter.index}
                             disabled={isPlaced}
                             onClick={() => handleLetterFromPoolToSlot(letter)}
-                            className={`w-12 h-12 rounded-xl font-cyber font-black text-xl border-2 flex items-center justify-center transition-all ${
+                            className={`w-9 h-9 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl font-cyber font-black text-base sm:text-xl border-2 flex items-center justify-center transition-all ${
                               isPlaced 
                                 ? "border-slate-900 bg-slate-950/20 text-slate-800 opacity-20 scale-95" 
                                 : "border-amber-500 bg-amber-500/10 text-amber-400 hover:bg-amber-500/25 hover:scale-110 cursor-pointer shadow-[0_0_12px_rgba(245,158,11,0.15)]"
@@ -3198,22 +3204,22 @@ export default function App() {
 
                 {/* GAVE UP SHOW ANSWER SCREEN */}
                 {gaveUp && (
-                  <div className="p-4 bg-rose-950/20 border border-rose-500/30 rounded-xl text-center">
+                  <div className="p-3 sm:p-4 bg-rose-950/20 border border-rose-500/30 rounded-xl text-center">
                     <span className="text-xs text-rose-400 block mb-1">WORD REVEALED</span>
-                    <span className="text-2xl font-black font-cyber text-white tracking-widest uppercase">{unscrambleWordInfo.word}</span>
-                    <p className="text-[11px] text-slate-400 mt-2">Loading next objective in 4 seconds...</p>
+                    <span className="text-xl sm:text-2xl font-black font-cyber text-white tracking-widest uppercase">{unscrambleWordInfo.word}</span>
+                    <p className="text-[11px] text-slate-400 mt-1 sm:mt-2">Loading next objective in 4 seconds...</p>
                   </div>
                 )}
 
                 {/* Actions */}
-                <div className="flex gap-3 justify-between items-center mt-2 border-t border-slate-800/60 pt-4">
+                <div className="flex flex-wrap sm:flex-nowrap gap-2 justify-between items-center mt-1 sm:mt-2 border-t border-slate-800/60 pt-3 sm:pt-4 shrink-0">
                   
                   {/* Give up button */}
                   <div>
                     <button
                       disabled={unscrambleTime < 10 || gaveUp}
                       onClick={handleGiveUpUnscramble}
-                      className={`px-4 py-2 rounded-xl text-xs font-cyber font-bold transition-all border ${
+                      className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-[10px] sm:text-xs font-cyber font-bold transition-all border ${
                         unscrambleTime >= 10 && !gaveUp
                           ? "bg-rose-950/40 border-rose-500/50 hover:bg-rose-900/30 text-rose-400 cursor-pointer"
                           : "bg-slate-900/50 border-slate-800/80 text-slate-600 cursor-not-allowed"
@@ -3224,23 +3230,23 @@ export default function App() {
                   </div>
 
                   {!gaveUp && (
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap sm:flex-nowrap gap-1.5 sm:gap-2 items-center justify-end w-full sm:w-auto">
                       <button
                         onClick={handlePayForHelp}
-                        className="px-4 py-2 bg-amber-950/40 hover:bg-amber-900/30 border border-amber-500/40 hover:border-amber-500/80 text-amber-400 rounded-xl text-xs font-cyber font-bold cursor-pointer transition-all"
+                        className="px-2.5 sm:px-4 py-1.5 sm:py-2 bg-amber-950/40 hover:bg-amber-900/30 border border-amber-500/40 hover:border-amber-500/80 text-amber-400 rounded-xl text-[10px] sm:text-xs font-cyber font-bold cursor-pointer transition-all"
                       >
-                        Buy Hint (${Math.round(unscrambleWordInfo.word.length * 20 * 0.1)})
+                        Hint (${Math.round(unscrambleWordInfo.word.length * 20 * 0.1)})
                       </button>
                       <button
                         onClick={handleClearUnscramble}
-                        className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 rounded-xl text-xs font-cyber font-bold text-slate-300 cursor-pointer"
+                        className="px-2.5 sm:px-4 py-1.5 sm:py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 rounded-xl text-[10px] sm:text-xs font-cyber font-bold text-slate-300 cursor-pointer"
                       >
                         Reset
                       </button>
                       <button
                         disabled={unscrambleSlots.length < unscrambleWordInfo.word.length}
                         onClick={handleSubmitUnscramble}
-                        className={`px-5 py-2 rounded-xl text-xs font-cyber font-bold tracking-wider uppercase transition-all ${
+                        className={`px-4 sm:px-5 py-2 rounded-xl text-[11px] sm:text-xs font-cyber font-bold tracking-wider uppercase transition-all shrink-0 ${
                           unscrambleSlots.length === unscrambleWordInfo.word.length
                             ? "bg-amber-500 hover:bg-amber-400 text-slate-950 font-black cursor-pointer shadow-[0_0_15px_rgba(245,158,11,0.35)]"
                             : "bg-slate-900 text-slate-600 border border-slate-800/80 cursor-not-allowed"
